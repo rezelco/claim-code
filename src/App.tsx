@@ -705,15 +705,15 @@ function App() {
           <>
             {/* Claim Success Result */}
             {claimResult && claimStep === 'complete' && (
-              <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl overflow-hidden shadow-lg">
-                <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-6">
+              <div className="mb-8 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-6">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                       <CheckCircle className="w-7 h-7 text-white" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">🎉 Success! Funds have been sent to your wallet.</h2>
-                      <p className="text-green-100 mt-1">
+                      <p className="text-purple-100 mt-1">
                         {claimResult.amount} ALGO claimed on {getNetworkConfig().name}
                       </p>
                     </div>
@@ -722,7 +722,7 @@ function App() {
                 
                 <div className="p-6 space-y-4">
                   {/* Transaction Details */}
-                  <div className="bg-white rounded-xl p-5 border border-green-200 shadow-sm">
+                  <div className="bg-white rounded-xl p-5 border border-purple-200 shadow-sm">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Claim Details</h3>
                     <div className="space-y-3">
                       <div>
@@ -742,7 +742,7 @@ function App() {
                             href={getExplorerUrl(claimResult.transactionId)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800"
+                            className="flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-800"
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>Explorer</span>
@@ -759,7 +759,7 @@ function App() {
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       onClick={handleClaimAnother}
-                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
                     >
                       <Download className="w-5 h-5" />
                       <span>Claim Another</span>
@@ -781,9 +781,9 @@ function App() {
             {/* Claim Form */}
             {claimStep !== 'complete' && (
               <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-6">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-6">
                   <h2 className="text-2xl font-bold text-white">Claim Funds</h2>
-                  <p className="text-green-100 mt-1">
+                  <p className="text-purple-100 mt-1">
                     Enter your claim code to receive Algos on {getNetworkConfig().name}
                   </p>
                 </div>
@@ -791,10 +791,10 @@ function App() {
                 <div className="p-6 space-y-6">
                   {/* Progress Indicator */}
                   {claimLoading && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center space-x-3">
-                      <Loader2 className="w-5 h-5 text-green-500 animate-spin flex-shrink-0" />
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center space-x-3">
+                      <Loader2 className="w-5 h-5 text-purple-500 animate-spin flex-shrink-0" />
                       <div>
-                        <p className="text-green-800 font-medium">{getClaimStepMessage()}</p>
+                        <p className="text-purple-800 font-medium">{getClaimStepMessage()}</p>
                       </div>
                     </div>
                   )}
@@ -810,7 +810,7 @@ function App() {
                       onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
                       placeholder="Enter your claim code"
                       disabled={claimLoading}
-                      className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
+                      className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Enter the claim code you received to claim your funds
@@ -819,12 +819,12 @@ function App() {
 
                   {/* Wallet Status */}
                   {walletConnected && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                       <div className="flex items-center space-x-3">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <CheckCircle className="w-5 h-5 text-purple-500" />
                         <div>
-                          <p className="text-green-800 font-medium">Wallet Connected</p>
-                          <p className="text-green-700 text-sm">
+                          <p className="text-purple-800 font-medium">Wallet Connected</p>
+                          <p className="text-purple-700 text-sm">
                             Funds will be sent to: {connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}
                           </p>
                         </div>
@@ -836,7 +836,7 @@ function App() {
                   <button
                     onClick={handleClaimFunds}
                     disabled={claimLoading || !walletConnected || claimStep !== 'form'}
-                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                   >
                     {claimLoading ? (
                       <>
