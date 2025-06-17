@@ -338,6 +338,20 @@ Network: Algorand ${networkName}`,
   }
 }
 
+// Root endpoint to confirm server is running
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'RandCash API Server is running!',
+    version: '1.0.0',
+    endpoints: [
+      'GET /api/health',
+      'POST /api/create-claim',
+      'POST /api/submit-transaction'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
 // API endpoint to create claim
 app.post('/api/create-claim', async (req, res) => {
   try {
