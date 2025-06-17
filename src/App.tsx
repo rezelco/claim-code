@@ -494,7 +494,7 @@ function App() {
                 onClick={() => handleTabChange('claim')}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
                   activeTab === 'claim'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                    ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-sm'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
