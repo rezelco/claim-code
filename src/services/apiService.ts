@@ -43,6 +43,19 @@ interface SubmitTransactionResponse {
   notificationMethod?: string;
 }
 
+interface ClaimFundsRequest {
+  claimCode: string;
+  walletAddress: string;
+  network: string;
+}
+
+interface ClaimFundsResponse {
+  success: boolean;
+  transactionId: string;
+  amount: number;
+  message?: string;
+}
+
 export const createClaim = async (request: Omit<CreateClaimRequest, 'network'>): Promise<CreateClaimResponse> => {
   try {
     const network = getCurrentNetwork();
@@ -90,6 +103,31 @@ export const submitTransaction = async (request: Omit<SubmitTransactionRequest, 
       throw error;
     }
     throw new Error('Network error occurred while submitting transaction');
+  }
+};
+
+export const claimFunds = async (request: Omit<ClaimFundsRequest, 'network'>): Promise<ClaimFundsResponse> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch('/api/claim-funds', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, network }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to claim funds');
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while claiming funds');
   }
 };
 
