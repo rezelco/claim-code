@@ -223,20 +223,12 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
       throw new Error('Invalid Algorand address format');
     }
 
-    // Convert to canonical address format required by the SDK
-    const canonicalAddress = algosdk.canonicalAddress(trimmedSenderAddress);
-    
-    // Additional safety check to ensure canonicalAddress is not null/undefined
-    if (!canonicalAddress || typeof canonicalAddress !== 'string') {
-      throw new Error('Failed to process sender address - address is null or undefined');
-    }
-
     const algodClient = createAlgodClient(network);
     const suggestedParams = await algodClient.getTransactionParams().do();
     
     // Create application creation transaction
     const appCreateTxn = algosdk.makeApplicationCreateTxnFromObject({
-      from: canonicalAddress,
+      from: trimmedSenderAddress,
       suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: compiledProgram,
