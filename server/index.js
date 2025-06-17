@@ -205,37 +205,44 @@ async function compileTealProgram(tealSource, network = 'testnet') {
   }
 }
 
+// Validate Algorand address format
+function validateAlgorandAddress(address) {
+  if (!address || typeof address !== 'string') {
+    throw new Error('Address must be a valid string');
+  }
+  
+  const trimmedAddress = address.trim();
+  if (!trimmedAddress) {
+    throw new Error('Address cannot be empty');
+  }
+  
+  // Use algosdk's built-in validation
+  if (!algosdk.isValidAddress(trimmedAddress)) {
+    throw new Error('Invalid Algorand address format');
+  }
+  
+  // Additional validation by attempting to decode the address
+  try {
+    algosdk.decodeAddress(trimmedAddress);
+  } catch (decodeError) {
+    throw new Error(`Address validation failed: ${decodeError.message}`);
+  }
+  
+  return trimmedAddress;
+}
+
 // Deploy smart contract to Algorand
 async function deployContract(compiledProgram, senderAddress, claimHash, amount, network = 'testnet') {
   try {
-    // Validate senderAddress before using it
-    if (!senderAddress || typeof senderAddress !== 'string') {
-      throw new Error('Sender address is required and must be a valid string');
-    }
-    
-    const trimmedSenderAddress = senderAddress.trim();
-    if (!trimmedSenderAddress) {
-      throw new Error('Sender address cannot be empty');
-    }
-    
-    // Validate that it's a proper Algorand address
-    if (!algosdk.isValidAddress(trimmedSenderAddress)) {
-      throw new Error('Invalid Algorand address format');
-    }
-
-    // Additional validation using algosdk's decodeAddress to ensure strict compatibility
-    try {
-      algosdk.decodeAddress(trimmedSenderAddress);
-    } catch (decodeError) {
-      throw new Error(`Invalid Algorand address format - algosdk validation failed: ${decodeError.message}`);
-    }
+    // Validate and clean the sender address
+    const validatedSenderAddress = validateAlgorandAddress(senderAddress);
 
     const algodClient = createAlgodClient(network);
     const suggestedParams = await algodClient.getTransactionParams().do();
     
     // Create application creation transaction
     const appCreateTxn = algosdk.makeApplicationCreateTxnFromObject({
-      from: trimmedSenderAddress,
+      from: validatedSenderAddress,
       suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: compiledProgram,
@@ -400,19 +407,12 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: 'Please provide a valid email address' });
     }
     
-    // Enhanced sender address validation
-    if (!senderAddress || typeof senderAddress !== 'string') {
-      return res.status(400).json({ error: 'Sender address is required and must be a valid string' });
-    }
-
-    const trimmedSenderAddress = senderAddress.trim();
-    if (!trimmedSenderAddress) {
-      return res.status(400).json({ error: 'Sender address cannot be empty' });
-    }
-
-    // Validate sender address format
-    if (!algosdk.isValidAddress(trimmedSenderAddress)) {
-      return res.status(400).json({ error: 'Invalid sender address format' });
+    // Validate sender address using our helper function
+    let validatedSenderAddress;
+    try {
+      validatedSenderAddress = validateAlgorandAddress(senderAddress);
+    } catch (addressError) {
+      return res.status(400).json({ error: `Invalid sender address: ${addressError.message}` });
     }
 
     // Additional validation for MainNet
@@ -420,7 +420,7 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: 'Maximum amount on MainNet is 10 ALGO for safety' });
     }
 
-    console.log(`Creating claim for ${amount} ALGO from ${trimmedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
+    console.log(`Creating claim for ${amount} ALGO from ${validatedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
 
     // Generate claim code and hash it
     const claimCode = generateClaimCode();
@@ -438,7 +438,7 @@ app.post('/api/create-claim', async (req, res) => {
     // Create contract deployment transaction with validated sender address
     const { transaction: deployTxn, txId } = await deployContract(
       compiledProgram, 
-      trimmedSenderAddress, 
+      validatedSenderAddress, 
       hashedClaimCode, 
       amount,
       network
