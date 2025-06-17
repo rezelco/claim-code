@@ -194,14 +194,23 @@ return`;
 async function compileTealProgram(tealSource, network = 'testnet') {
   try {
     const algodClient = createAlgodClient(network);
+    
+    // Test connection first
+    await algodClient.status().do();
+    
     const compileResponse = await algodClient.compile(tealSource).do();
+    
+    if (!compileResponse.result) {
+      throw new Error('TEAL compilation failed - no result returned');
+    }
+    
     return {
       compiledProgram: new Uint8Array(Buffer.from(compileResponse.result, 'base64')),
       hash: compileResponse.hash
     };
   } catch (error) {
     console.error('Error compiling TEAL program:', error);
-    throw new Error('Failed to compile smart contract');
+    throw new Error(`Failed to compile smart contract: ${error.message}`);
   }
 }
 
@@ -234,37 +243,103 @@ function validateAlgorandAddress(address) {
 // Deploy smart contract to Algorand
 async function deployContract(compiledProgram, senderAddress, claimHash, amount, network = 'testnet') {
   try {
+    // Validate inputs
+    if (!compiledProgram || !(compiledProgram instanceof Uint8Array)) {
+      throw new Error('Invalid compiled program - must be Uint8Array');
+    }
+    
+    if (!claimHash || !(claimHash instanceof Uint8Array)) {
+      throw new Error('Invalid claim hash - must be Uint8Array');
+    }
+    
+    if (!amount || amount <= 0) {
+      throw new Error('Invalid amount - must be positive number');
+    }
+
     // Validate and clean the sender address
     const validatedSenderAddress = validateAlgorandAddress(senderAddress);
 
     const algodClient = createAlgodClient(network);
-    const suggestedParams = await algodClient.getTransactionParams().do();
     
-    // Create application creation transaction
+    // Test connection and get suggested params
+    let suggestedParams;
+    try {
+      suggestedParams = await algodClient.getTransactionParams().do();
+      console.log('✅ Successfully fetched transaction parameters');
+    } catch (paramError) {
+      console.error('❌ Failed to fetch transaction parameters:', paramError);
+      throw new Error(`Network connection failed: ${paramError.message}`);
+    }
+    
+    // Validate suggested params
+    if (!suggestedParams || !suggestedParams.fee || !suggestedParams.firstRound || !suggestedParams.lastRound) {
+      throw new Error('Invalid transaction parameters received from network');
+    }
+
+    // Create clear program (simple program that always approves)
+    const clearProgram = new Uint8Array([0x06, 0x81, 0x01]); // TEAL: #pragma version 8; int 1; return
+    
+    // Prepare application arguments as Uint8Array
+    const appArgs = [
+      new TextEncoder().encode('setup'),
+      claimHash,
+      algosdk.encodeUint64(Math.floor(amount * 1000000)) // Convert ALGO to microAlgos
+    ];
+    
+    // Validate all appArgs are Uint8Array
+    appArgs.forEach((arg, index) => {
+      if (!(arg instanceof Uint8Array)) {
+        throw new Error(`Application argument ${index} is not Uint8Array`);
+      }
+    });
+
+    console.log('📝 Creating application transaction with:');
+    console.log(`  - From: ${validatedSenderAddress}`);
+    console.log(`  - Approval program size: ${compiledProgram.length} bytes`);
+    console.log(`  - Clear program size: ${clearProgram.length} bytes`);
+    console.log(`  - App args count: ${appArgs.length}`);
+    console.log(`  - Amount (microAlgos): ${Math.floor(amount * 1000000)}`);
+    
+    // Create application creation transaction with all required parameters
     const appCreateTxn = algosdk.makeApplicationCreateTxnFromObject({
       from: validatedSenderAddress,
-      suggestedParams,
+      suggestedParams: suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: compiledProgram,
-      clearProgram: new Uint8Array([0x06, 0x81, 0x01]), // Simple clear program
+      clearProgram: clearProgram,
       numLocalInts: 0,
       numLocalByteSlices: 0,
       numGlobalInts: 2, // amount, claimed
       numGlobalByteSlices: 1, // claim_hash
-      appArgs: [
-        new TextEncoder().encode('setup'),
-        claimHash,
-        algosdk.encodeUint64(amount * 1000000) // Convert ALGO to microAlgos
-      ]
+      appArgs: appArgs,
+      accounts: undefined,
+      foreignApps: undefined,
+      foreignAssets: undefined,
+      note: undefined,
+      lease: undefined,
+      rekeyTo: undefined
     });
+
+    console.log('✅ Application transaction created successfully');
+    console.log(`  - Transaction ID: ${appCreateTxn.txID()}`);
 
     return {
       transaction: appCreateTxn,
       txId: appCreateTxn.txID()
     };
   } catch (error) {
-    console.error('Error creating contract deployment transaction:', error);
-    throw new Error(`Failed to create contract deployment transaction: ${error.message}`);
+    console.error('❌ Error creating contract deployment transaction:', error);
+    
+    // Provide more specific error information
+    if (error.message.includes('Address must not be null')) {
+      throw new Error('Invalid sender address provided to transaction creation');
+    } else if (error.message.includes('suggestedParams')) {
+      throw new Error('Failed to get valid network parameters - check network connectivity');
+    } else if (error.message.includes('approvalProgram')) {
+      throw new Error('Invalid approval program - compilation may have failed');
+    } else {
+      throw new Error(`Failed to create contract deployment transaction: ${error.message}`);
+    }
   }
 }
 
@@ -387,6 +462,14 @@ app.post('/api/create-claim', async (req, res) => {
   try {
     const { amount, recipient, message, senderAddress, network = 'testnet' } = req.body;
 
+    console.log(`📥 Received create-claim request:`, {
+      amount,
+      recipient: recipient ? `${recipient.substring(0, 5)}...` : 'undefined',
+      senderAddress: senderAddress ? `${senderAddress.substring(0, 8)}...` : 'undefined',
+      network,
+      hasMessage: !!message
+    });
+
     // Validate network
     if (!NETWORK_CONFIGS[network]) {
       return res.status(400).json({ error: 'Invalid network specified' });
@@ -420,7 +503,7 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: 'Maximum amount on MainNet is 10 ALGO for safety' });
     }
 
-    console.log(`Creating claim for ${amount} ALGO from ${validatedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
+    console.log(`✅ Creating claim for ${amount} ALGO from ${validatedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
 
     // Generate claim code and hash it
     const claimCode = generateClaimCode();
@@ -430,12 +513,16 @@ app.post('/api/create-claim', async (req, res) => {
     const recipientHash = crypto.createHash('sha256').update(recipient.toLowerCase().trim()).digest();
 
     // Create TEAL program
+    console.log('📝 Creating TEAL program...');
     const tealProgram = createEscrowContractTeal(hashedClaimCode, recipientHash, amount);
     
     // Compile the TEAL program
+    console.log('🔨 Compiling TEAL program...');
     const { compiledProgram, hash: programHash } = await compileTealProgram(tealProgram, network);
+    console.log(`✅ TEAL compilation successful, hash: ${programHash}`);
     
     // Create contract deployment transaction with validated sender address
+    console.log('📋 Creating deployment transaction...');
     const { transaction: deployTxn, txId } = await deployContract(
       compiledProgram, 
       validatedSenderAddress, 
@@ -443,11 +530,13 @@ app.post('/api/create-claim', async (req, res) => {
       amount,
       network
     );
+    console.log(`✅ Deployment transaction created: ${txId}`);
 
     // Send email notification
+    console.log('📧 Sending email notification...');
     const notificationResult = await sendEmailNotification(recipient, claimCode, amount, message, network);
     
-    console.log(`Claim created successfully on ${NETWORK_CONFIGS[network].name}:`);
+    console.log(`🎉 Claim created successfully on ${NETWORK_CONFIGS[network].name}:`);
     console.log(`- Claim code: ${claimCode}`);
     console.log(`- Transaction ID: ${txId}`);
     console.log(`- Program hash: ${programHash}`);
@@ -465,7 +554,7 @@ app.post('/api/create-claim', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creating claim:', error);
+    console.error('❌ Error creating claim:', error);
     res.status(500).json({ 
       error: error.message || 'Internal server error occurred while creating claim' 
     });
@@ -476,6 +565,8 @@ app.post('/api/create-claim', async (req, res) => {
 app.post('/api/submit-transaction', async (req, res) => {
   try {
     const { signedTransaction, network = 'testnet' } = req.body;
+    
+    console.log(`📥 Received submit-transaction request for ${NETWORK_CONFIGS[network]?.name || network}`);
     
     // Validate network
     if (!NETWORK_CONFIGS[network]) {
@@ -489,20 +580,24 @@ app.post('/api/submit-transaction', async (req, res) => {
     const algodClient = createAlgodClient(network);
 
     // Decode and submit the signed transaction
+    console.log('📤 Submitting signed transaction to network...');
     const signedTxnBuffer = Buffer.from(signedTransaction, 'base64');
     const txResponse = await algodClient.sendRawTransaction(signedTxnBuffer).do();
+    console.log(`✅ Transaction submitted: ${txResponse.txId}`);
     
     // Wait for confirmation
+    console.log('⏳ Waiting for transaction confirmation...');
     const confirmedTxn = await algosdk.waitForConfirmation(algodClient, txResponse.txId, 4);
     
     // Get the application ID from the confirmed transaction
     const appId = confirmedTxn['application-index'];
     const appAddress = algosdk.getApplicationAddress(appId);
     
-    console.log(`Contract deployed successfully on ${NETWORK_CONFIGS[network].name}:`);
+    console.log(`🎉 Contract deployed successfully on ${NETWORK_CONFIGS[network].name}:`);
     console.log(`- Application ID: ${appId}`);
     console.log(`- Contract Address: ${appAddress}`);
     console.log(`- Transaction ID: ${txResponse.txId}`);
+    console.log(`- Confirmed Round: ${confirmedTxn['confirmed-round']}`);
 
     res.json({
       success: true,
@@ -513,7 +608,7 @@ app.post('/api/submit-transaction', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error submitting transaction:', error);
+    console.error('❌ Error submitting transaction:', error);
     res.status(500).json({ 
       error: error.message || 'Failed to submit transaction' 
     });
