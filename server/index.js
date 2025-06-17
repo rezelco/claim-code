@@ -208,12 +208,27 @@ async function compileTealProgram(tealSource, network = 'testnet') {
 // Deploy smart contract to Algorand
 async function deployContract(compiledProgram, senderAddress, claimHash, amount, network = 'testnet') {
   try {
+    // Validate senderAddress before using it
+    if (!senderAddress || typeof senderAddress !== 'string') {
+      throw new Error('Sender address is required and must be a valid string');
+    }
+    
+    const trimmedSenderAddress = senderAddress.trim();
+    if (!trimmedSenderAddress) {
+      throw new Error('Sender address cannot be empty');
+    }
+    
+    // Validate that it's a proper Algorand address
+    if (!algosdk.isValidAddress(trimmedSenderAddress)) {
+      throw new Error('Invalid Algorand address format');
+    }
+
     const algodClient = createAlgodClient(network);
     const suggestedParams = await algodClient.getTransactionParams().do();
     
     // Create application creation transaction
     const appCreateTxn = algosdk.makeApplicationCreateTxnFromObject({
-      from: senderAddress,
+      from: trimmedSenderAddress,
       suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: compiledProgram,
@@ -378,13 +393,19 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: 'Please provide a valid email address' });
     }
     
-    if (!senderAddress) {
-      return res.status(400).json({ error: 'Sender address is required' });
+    // Enhanced sender address validation
+    if (!senderAddress || typeof senderAddress !== 'string') {
+      return res.status(400).json({ error: 'Sender address is required and must be a valid string' });
+    }
+
+    const trimmedSenderAddress = senderAddress.trim();
+    if (!trimmedSenderAddress) {
+      return res.status(400).json({ error: 'Sender address cannot be empty' });
     }
 
     // Validate sender address format
-    if (!algosdk.isValidAddress(senderAddress)) {
-      return res.status(400).json({ error: 'Invalid sender address' });
+    if (!algosdk.isValidAddress(trimmedSenderAddress)) {
+      return res.status(400).json({ error: 'Invalid sender address format' });
     }
 
     // Additional validation for MainNet
@@ -392,7 +413,7 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: 'Maximum amount on MainNet is 10 ALGO for safety' });
     }
 
-    console.log(`Creating claim for ${amount} ALGO from ${senderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
+    console.log(`Creating claim for ${amount} ALGO from ${trimmedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
 
     // Generate claim code and hash it
     const claimCode = generateClaimCode();
@@ -407,10 +428,10 @@ app.post('/api/create-claim', async (req, res) => {
     // Compile the TEAL program
     const { compiledProgram, hash: programHash } = await compileTealProgram(tealProgram, network);
     
-    // Create contract deployment transaction
+    // Create contract deployment transaction with validated sender address
     const { transaction: deployTxn, txId } = await deployContract(
       compiledProgram, 
-      senderAddress, 
+      trimmedSenderAddress, 
       hashedClaimCode, 
       amount,
       network
