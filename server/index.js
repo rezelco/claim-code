@@ -3,8 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import algosdk from 'algosdk';
 import crypto from 'crypto';
-import twilio from 'twilio';
-import sgMail from '@sendgrid/mail';
+import axios from 'axios';
 
 const app = express();
 const PORT = 3001;
@@ -39,54 +38,23 @@ function createAlgodClient(network = 'testnet') {
   return new algosdk.Algodv2(config.algodToken, config.algodServer, config.algodPort);
 }
 
-// Initialize Twilio client only if valid credentials are provided
-let twilioClient = null;
-const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+// Initialize Pica/Resend email service
+const picaSecretKey = process.env.PICA_SECRET_KEY;
+const picaConnectionKey = process.env.PICA_RESEND_CONNECTION_KEY;
+const picaFromEmail = process.env.PICA_FROM_EMAIL;
 
-// Check if Twilio credentials are valid (not placeholder values)
-const isValidTwilioConfig = 
-  twilioAccountSid && 
-  twilioAuthToken && 
-  twilioPhoneNumber &&
-  twilioAccountSid.startsWith('AC') &&
-  twilioAccountSid !== 'your_twilio_account_sid' &&
-  twilioAuthToken !== 'your_twilio_auth_token' &&
-  twilioPhoneNumber !== 'your_twilio_phone_number';
+const isValidPicaConfig = 
+  picaSecretKey && 
+  picaConnectionKey && 
+  picaFromEmail &&
+  picaSecretKey !== 'your_pica_secret_key' &&
+  picaConnectionKey !== 'your_pica_resend_connection_key' &&
+  picaFromEmail !== 'noreply@randcash.app';
 
-if (isValidTwilioConfig) {
-  try {
-    twilioClient = twilio(twilioAccountSid, twilioAuthToken);
-    console.log('✅ Twilio client initialized successfully');
-  } catch (error) {
-    console.warn('⚠️ Failed to initialize Twilio client:', error.message);
-    console.log('📱 SMS notifications will be simulated');
-  }
+if (isValidPicaConfig) {
+  console.log('✅ Pica/Resend email service configured');
 } else {
-  console.log('📱 Twilio not configured - SMS notifications will be simulated');
-}
-
-// Initialize SendGrid client only if valid credentials are provided
-const sendGridApiKey = process.env.SENDGRID_API_KEY;
-const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
-
-const isValidSendGridConfig = 
-  sendGridApiKey && 
-  sendGridFromEmail &&
-  sendGridApiKey !== 'your_sendgrid_api_key' &&
-  sendGridFromEmail !== 'noreply@randcash.app';
-
-if (isValidSendGridConfig) {
-  try {
-    sgMail.setApiKey(sendGridApiKey);
-    console.log('✅ SendGrid client initialized successfully');
-  } catch (error) {
-    console.warn('⚠️ Failed to initialize SendGrid client:', error.message);
-    console.log('📧 Email notifications will be simulated');
-  }
-} else {
-  console.log('📧 SendGrid not configured - Email notifications will be simulated');
+  console.log('📧 Pica/Resend not configured - Email notifications will be simulated');
 }
 
 // Generate secure random claim code
@@ -270,60 +238,103 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
   }
 }
 
-// Send notification via SMS or Email
-async function sendNotification(recipient, claimCode, amount, message, network = 'testnet') {
-  const isEmail = recipient.includes('@');
+// Send email notification via Pica/Resend
+async function sendEmailNotification(recipient, claimCode, amount, message, network = 'testnet') {
   const networkName = NETWORK_CONFIGS[network].name;
-  const notificationMessage = `You've received ${amount} ALGO on RandCash (${networkName})! ${message ? `Message: "${message}"` : ''} Use claim code: ${claimCode} to claim your funds.`;
-
+  
   try {
-    if (isEmail) {
-      // Send email via SendGrid
-      if (!isValidSendGridConfig) {
-        console.log(`📧 [SIMULATED EMAIL] To: ${recipient}: ${notificationMessage}`);
-        return { success: true, method: 'email_simulation' };
-      }
-
-      const msg = {
-        to: recipient,
-        from: sendGridFromEmail,
-        subject: `You've received ${amount} ALGO on RandCash (${networkName})!`,
-        text: notificationMessage,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">You've received ${amount} ALGO!</h2>
-            <p>Someone sent you cryptocurrency using RandCash on Algorand ${networkName}.</p>
-            ${message ? `<p><strong>Message:</strong> "${message}"</p>` : ''}
-            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Your claim code:</strong></p>
-              <p style="font-family: monospace; font-size: 18px; font-weight: bold; color: #1f2937; background: white; padding: 10px; border-radius: 4px;">${claimCode}</p>
-            </div>
-            <p>Visit RandCash to claim your funds by entering this code and connecting your wallet.</p>
-            <p style="color: #6b7280; font-size: 12px;">Network: Algorand ${networkName}</p>
-          </div>
-        `
-      };
-
-      await sgMail.send(msg);
-      return { success: true, method: 'email' };
-    } else {
-      // Send SMS via Twilio
-      if (!isValidTwilioConfig) {
-        console.log(`📱 [SIMULATED SMS] To: ${recipient}: ${notificationMessage}`);
-        return { success: true, method: 'sms_simulation' };
-      }
-
-      await twilioClient.messages.create({
-        body: notificationMessage,
-        from: twilioPhoneNumber,
-        to: recipient
-      });
-      return { success: true, method: 'sms' };
+    if (!isValidPicaConfig) {
+      const notificationMessage = `You've received ${amount} ALGO on RandCash (${networkName})! ${message ? `Message: "${message}"` : ''} Use claim code: ${claimCode} to claim your funds.`;
+      console.log(`📧 [SIMULATED EMAIL] To: ${recipient}: ${notificationMessage}`);
+      return { success: true, method: 'email_simulation' };
     }
+
+    const emailData = {
+      from: `RandCash <${picaFromEmail}>`,
+      to: recipient,
+      subject: `You've received ${amount} ALGO on RandCash (${networkName})!`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="display: inline-block; width: 60px; height: 60px; background: linear-gradient(135deg, #2563eb, #4f46e5); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">💸</span>
+            </div>
+            <h1 style="color: #1f2937; margin: 0; font-size: 28px; font-weight: bold;">You've received ${amount} ALGO!</h1>
+          </div>
+          
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
+            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+              Someone sent you cryptocurrency using RandCash on Algorand ${networkName}.
+            </p>
+            ${message ? `
+              <div style="background: white; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid #2563eb;">
+                <p style="color: #6b7280; font-size: 14px; margin: 0 0 4px 0; font-weight: 600;">Message:</p>
+                <p style="color: #1f2937; font-size: 16px; margin: 0; font-style: italic;">"${message}"</p>
+              </div>
+            ` : ''}
+          </div>
+          
+          <div style="background: linear-gradient(135deg, #eff6ff, #dbeafe); border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <p style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">Your Claim Code:</p>
+            <div style="background: white; border-radius: 8px; padding: 16px; margin: 12px 0; border: 2px solid #2563eb;">
+              <p style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #1f2937; margin: 0; letter-spacing: 2px;">
+                ${claimCode}
+              </p>
+            </div>
+            <p style="color: #1e40af; font-size: 14px; margin: 12px 0 0 0;">
+              Keep this code safe - you'll need it to claim your funds!
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="https://randcash.app" style="display: inline-block; background: linear-gradient(135deg, #2563eb, #4f46e5); color: white; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+              Claim Your Funds →
+            </a>
+          </div>
+          
+          <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 32px;">
+            <p style="color: #6b7280; font-size: 12px; text-align: center; margin: 0;">
+              Network: Algorand ${networkName} • Powered by RandCash
+            </p>
+          </div>
+        </div>
+      `,
+      text: `You've received ${amount} ALGO on RandCash (${networkName})!
+
+${message ? `Message: "${message}"` : ''}
+
+Your claim code: ${claimCode}
+
+Visit RandCash to claim your funds by entering this code and connecting your wallet.
+
+Network: Algorand ${networkName}`,
+      tags: [
+        { name: 'service', value: 'randcash' },
+        { name: 'type', value: 'claim_notification' },
+        { name: 'network', value: network }
+      ]
+    };
+
+    const response = await axios.post('https://api.picaos.com/v1/passthrough/email', emailData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-pica-secret': picaSecretKey,
+        'x-pica-connection-key': picaConnectionKey,
+        'x-pica-action-id': 'conn_mod_def::GC4q4JE4I28::x8Elxo0VRMK1X-uH1C3NeA',
+      }
+    });
+
+    console.log(`✅ Email sent successfully! ID: ${response.data.id}`);
+    return { success: true, method: 'email', emailId: response.data.id };
+
   } catch (error) {
-    console.error('Error sending notification:', error);
+    console.error('Error sending email:', error.response?.data || error.message);
     // Don't fail the entire transaction if notification fails
-    return { success: false, error: error.message, method: isEmail ? 'email' : 'sms' };
+    return { 
+      success: false, 
+      error: error.response?.data?.message || error.message, 
+      method: 'email' 
+    };
   }
 }
 
@@ -343,7 +354,13 @@ app.post('/api/create-claim', async (req, res) => {
     }
     
     if (!recipient || !recipient.trim()) {
-      return res.status(400).json({ error: 'Recipient is required' });
+      return res.status(400).json({ error: 'Recipient email is required' });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipient.trim())) {
+      return res.status(400).json({ error: 'Please provide a valid email address' });
     }
     
     if (!senderAddress) {
@@ -384,14 +401,14 @@ app.post('/api/create-claim', async (req, res) => {
       network
     );
 
-    // Send notification
-    const notificationResult = await sendNotification(recipient, claimCode, amount, message, network);
+    // Send email notification
+    const notificationResult = await sendEmailNotification(recipient, claimCode, amount, message, network);
     
     console.log(`Claim created successfully on ${NETWORK_CONFIGS[network].name}:`);
     console.log(`- Claim code: ${claimCode}`);
     console.log(`- Transaction ID: ${txId}`);
     console.log(`- Program hash: ${programHash}`);
-    console.log(`- Notification: ${notificationResult.success ? 'sent' : 'failed'} via ${notificationResult.method}`);
+    console.log(`- Email notification: ${notificationResult.success ? 'sent' : 'failed'}`);
 
     // Return the response with transaction to be signed
     res.json({
@@ -400,7 +417,8 @@ app.post('/api/create-claim', async (req, res) => {
       programHash,
       deploymentTransaction: Buffer.from(algosdk.encodeUnsignedTransaction(deployTxn)).toString('base64'),
       notificationSent: notificationResult.success,
-      notificationMethod: notificationResult.method
+      notificationMethod: notificationResult.method,
+      emailId: notificationResult.emailId
     });
 
   } catch (error) {
@@ -482,8 +500,7 @@ app.get('/api/health', async (req, res) => {
         lastRound: status['last-round']
       },
       services: {
-        twilio: isValidTwilioConfig ? 'connected' : 'simulated',
-        sendgrid: isValidSendGridConfig ? 'connected' : 'simulated'
+        email: isValidPicaConfig ? 'connected' : 'simulated'
       }
     });
   } catch (error) {
@@ -502,6 +519,5 @@ app.listen(PORT, () => {
     console.log(`  - ${config.name}: ${config.algodServer}`);
   });
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📱 Twilio SMS: ${isValidTwilioConfig ? 'Configured' : 'Not configured (will simulate)'}`);
-  console.log(`📧 SendGrid Email: ${isValidSendGridConfig ? 'Configured' : 'Not configured (will simulate)'}`);
+  console.log(`📧 Pica/Resend Email: ${isValidPicaConfig ? 'Configured' : 'Not configured (will simulate)'}`);
 });

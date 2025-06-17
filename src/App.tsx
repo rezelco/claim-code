@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Send, Wallet, Mail, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction } from './services/walletService';
 import { createClaim, submitTransaction } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
@@ -14,6 +14,7 @@ interface ClaimResult {
   contractAddress?: string;
   notificationSent: boolean;
   notificationMethod: string;
+  emailId?: string;
 }
 
 function App() {
@@ -120,9 +121,17 @@ function App() {
       return false;
     }
     if (!recipient.trim()) {
-      setError('Please enter recipient email or phone number');
+      setError('Please enter recipient email address');
       return false;
     }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipient.trim())) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    
     if (!walletConnected) {
       setError('Please connect your wallet first');
       return false;
@@ -177,7 +186,8 @@ function App() {
         applicationId: submitResponse.applicationId,
         contractAddress: submitResponse.contractAddress,
         notificationSent: claimResponse.notificationSent,
-        notificationMethod: claimResponse.notificationMethod
+        notificationMethod: claimResponse.notificationMethod,
+        emailId: claimResponse.emailId
       });
 
       setStep('complete');
@@ -192,20 +202,6 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-  const isValidPhone = (phone: string) => {
-    return /^\+?[\d\s\-\(\)]{10,}$/.test(phone);
-  };
-
-  const getRecipientIcon = () => {
-    if (isValidEmail(recipient)) return <Mail className="w-4 h-4" />;
-    if (isValidPhone(recipient)) return <Phone className="w-4 h-4" />;
-    return <Mail className="w-4 h-4" />;
   };
 
   const getStepMessage = () => {
@@ -313,7 +309,7 @@ function App() {
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-6">
             <h2 className="text-2xl font-bold text-white">Send Money</h2>
             <p className="text-blue-100 mt-1">
-              Send Algos to anyone using their email or phone on {getNetworkConfig().name}
+              Send Algos to anyone using their email on {getNetworkConfig().name}
             </p>
           </div>
           
@@ -362,17 +358,17 @@ function App() {
             {/* Recipient Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Recipient (Email or Phone)
+                Recipient Email
               </label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                  {getRecipientIcon()}
+                  <Mail className="w-4 h-4" />
                 </div>
                 <input
-                  type="text"
+                  type="email"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="email@example.com or +1234567890"
+                  placeholder="recipient@example.com"
                   disabled={isLoading}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
@@ -488,12 +484,13 @@ function App() {
                 <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
                   <p className="text-blue-800 font-medium">
-                    Notification {result.notificationSent ? 'sent' : 'simulated'} via {result.notificationMethod}
+                    Email notification {result.notificationSent ? 'sent' : 'simulated'}
+                    {result.emailId && ` (ID: ${result.emailId})`}
                   </p>
                   <p className="text-blue-700 mt-1">
                     {result.notificationSent 
                       ? `The claim code has been sent to ${recipient}. They can use it to claim the funds.`
-                      : `In production, the claim code would be sent to ${recipient} via ${result.notificationMethod}.`
+                      : `In production, the claim code would be sent to ${recipient} via email.`
                     }
                   </p>
                 </div>
