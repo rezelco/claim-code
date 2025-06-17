@@ -215,6 +215,7 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
     const appCreateTxn = algosdk.makeApplicationCreateTxnFromObject({
       from: senderAddress,
       suggestedParams,
+      onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: compiledProgram,
       clearProgram: new Uint8Array([0x06, 0x81, 0x01]), // Simple clear program
       numLocalInts: 0,
