@@ -223,6 +223,13 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
       throw new Error('Invalid Algorand address format');
     }
 
+    // Additional validation using algosdk's decodeAddress to ensure strict compatibility
+    try {
+      algosdk.decodeAddress(trimmedSenderAddress);
+    } catch (decodeError) {
+      throw new Error(`Invalid Algorand address format - algosdk validation failed: ${decodeError.message}`);
+    }
+
     const algodClient = createAlgodClient(network);
     const suggestedParams = await algodClient.getTransactionParams().do();
     
@@ -250,7 +257,7 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
     };
   } catch (error) {
     console.error('Error creating contract deployment transaction:', error);
-    throw new Error('Failed to create contract deployment transaction');
+    throw new Error(`Failed to create contract deployment transaction: ${error.message}`);
   }
 }
 
