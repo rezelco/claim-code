@@ -145,16 +145,39 @@ function App() {
 
     if (!validateForm()) return;
 
+    if (!connectedAccount) {
+      setError('No wallet account connected. Please connect your wallet first.');
+      return;
+    }
+
     setIsLoading(true);
     setStep('signing');
 
     try {
+      console.log('Creating claim with account:', connectedAccount);
+      console.log('Wallet connected state:', walletConnected);
+      console.log('Connected account type:', typeof connectedAccount);
+      console.log('Connected account value:', connectedAccount);
+      
+      // Get fresh account from wallet service
+      const currentAccount = await getConnectedAccount();
+      console.log('Fresh account from wallet service:', currentAccount);
+      
+      if (!currentAccount) {
+        throw new Error('Unable to get connected account from wallet');
+      }
+      
+      // Validate it's a proper Algorand address
+      if (!algosdk.isValidAddress(currentAccount)) {
+        throw new Error(`Invalid Algorand address format: ${currentAccount}`);
+      }
+      
       // Step 1: Create claim and get transaction to sign
       const claimResponse = await createClaim({
         amount: parseFloat(amount),
         recipient: recipient.trim(),
         message: message.trim(),
-        senderAddress: connectedAccount
+        senderAddress: currentAccount
       });
 
       // Step 2: Decode and sign the transaction
@@ -165,9 +188,15 @@ function App() {
       
       setStep('submitting');
 
-      // Step 3: Submit the signed transaction
+      // Step 3: Submit the signed transaction with claim details
       const submitResponse = await submitTransaction({
-        signedTransaction: Buffer.from(signedTxn).toString('base64')
+        signedTransaction: Buffer.from(signedTxn).toString('base64'),
+        claimDetails: {
+          recipient: claimResponse.claimDetails.recipient,
+          amount: claimResponse.claimDetails.amount,
+          message: claimResponse.claimDetails.message,
+          claimCode: claimResponse.claimCode
+        }
       });
 
       // Step 4: Show success result
@@ -176,8 +205,8 @@ function App() {
         transactionId: submitResponse.transactionId,
         applicationId: submitResponse.applicationId,
         contractAddress: submitResponse.contractAddress,
-        notificationSent: claimResponse.notificationSent,
-        notificationMethod: claimResponse.notificationMethod
+        notificationSent: submitResponse.notificationSent || false,
+        notificationMethod: submitResponse.notificationMethod || 'pending'
       });
 
       setStep('complete');
