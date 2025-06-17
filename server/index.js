@@ -832,11 +832,13 @@ app.post('/api/submit-transaction', async (req, res) => {
       throw new Error(`Application ID must be a positive integer, got: ${appId} (type: ${typeof appId})`);
     }
     
+    // Convert the Address object to string before sending to frontend
     const appAddress = algosdk.getApplicationAddress(appId);
+    const contractAddressString = appAddress.toString();
     
     console.log(`🎉 Contract deployed successfully on ${NETWORK_CONFIGS[network].name}:`);
     console.log(`- Application ID: ${appId}`);
-    console.log(`- Contract Address: ${appAddress}`);
+    console.log(`- Contract Address: ${contractAddressString}`);
     console.log(`- Transaction ID: ${txResponse.txId}`);
     console.log(`- Confirmed Round: ${confirmedTxn['confirmed-round']}`);
 
@@ -863,7 +865,7 @@ app.post('/api/submit-transaction', async (req, res) => {
       success: true,
       transactionId: txResponse.txId,
       applicationId: appId,
-      contractAddress: appAddress,
+      contractAddress: contractAddressString, // Send as string instead of Address object
       confirmedRound: confirmedTxn['confirmed-round'],
       notificationSent: notificationResult.success,
       notificationMethod: notificationResult.method
