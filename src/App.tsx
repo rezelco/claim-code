@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction } from './services/walletService';
 import { createClaim, submitTransaction } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
@@ -14,6 +14,9 @@ interface ClaimResult {
   contractAddress?: string;
   notificationSent: boolean;
   notificationMethod: string;
+  recipient: string;
+  amount: number;
+  message?: string;
 }
 
 function App() {
@@ -28,6 +31,7 @@ function App() {
   const [error, setError] = useState<string>('');
   const [step, setStep] = useState<'form' | 'signing' | 'submitting' | 'complete'>('form');
   const [showReconnectPrompt, setShowReconnectPrompt] = useState(false);
+  const [copiedField, setCopiedField] = useState<string>('');
 
   useEffect(() => {
     checkWalletConnection();
@@ -199,14 +203,17 @@ function App() {
         }
       });
 
-      // Step 4: Show success result
+      // Step 4: Show success result with all details
       setResult({
         claimCode: claimResponse.claimCode,
         transactionId: submitResponse.transactionId,
         applicationId: submitResponse.applicationId,
         contractAddress: submitResponse.contractAddress,
         notificationSent: submitResponse.notificationSent || false,
-        notificationMethod: submitResponse.notificationMethod || 'pending'
+        notificationMethod: submitResponse.notificationMethod || 'pending',
+        recipient: recipient.trim(),
+        amount: parseFloat(amount),
+        message: message.trim()
       });
 
       setStep('complete');
@@ -221,6 +228,22 @@ function App() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(''), 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
+  };
+
+  const handleSendAnother = () => {
+    setResult(null);
+    setStep('form');
+    setError('');
   };
 
   const isValidEmail = (email: string) => {
@@ -337,117 +360,287 @@ function App() {
           </div>
         )}
 
-        {/* Send Form */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-6">
-            <h2 className="text-2xl font-bold text-white">Send Money</h2>
-            <p className="text-blue-100 mt-1">
-              Send Algos to anyone using their email or phone on {getNetworkConfig().name}
-            </p>
-          </div>
-          
-          <div className="p-6 space-y-6">
-            {/* Progress Indicator */}
-            {isLoading && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center space-x-3">
-                <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+        {/* Success Result - Show prominently at the top when complete */}
+        {result && step === 'complete' && (
+          <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl overflow-hidden shadow-lg">
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-7 h-7 text-white" />
+                </div>
                 <div>
-                  <p className="text-blue-800 font-medium">{getStepMessage()}</p>
-                  {step === 'signing' && (
-                    <p className="text-blue-600 text-sm mt-1">
-                      Check your Pera wallet to approve the transaction
-                    </p>
+                  <h2 className="text-2xl font-bold text-white">Money Sent Successfully!</h2>
+                  <p className="text-green-100 mt-1">
+                    {result.amount} ALGO sent to {result.recipient} on {getNetworkConfig().name}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Transaction Summary */}
+              <div className="bg-white rounded-xl p-5 border border-green-200 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Transaction Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Amount Sent</p>
+                    <p className="text-xl font-bold text-gray-900">{result.amount} ALGO</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Recipient</p>
+                    <p className="text-lg font-medium text-gray-900 break-all">{result.recipient}</p>
+                  </div>
+                  {result.message && (
+                    <div className="md:col-span-2">
+                      <p className="text-sm text-gray-600 mb-1">Message</p>
+                      <p className="text-gray-900 italic">"{result.message}"</p>
+                    </div>
                   )}
                 </div>
               </div>
-            )}
 
-            {/* Amount Input */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount (ALGO)
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  disabled={isLoading}
-                  className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  step="0.001"
-                  min="0.001"
-                  max={isMainNet() ? "10" : undefined}
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
-                  ALGO
+              {/* Claim Code - Most Important */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-blue-900">Claim Code</h3>
+                  <button
+                    onClick={() => copyToClipboard(result.claimCode, 'claimCode')}
+                    className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>{copiedField === 'claimCode' ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+                <div className="bg-white rounded-lg p-4 border-2 border-blue-300">
+                  <p className="font-mono text-2xl font-bold text-gray-900 text-center tracking-wider">
+                    {result.claimCode}
+                  </p>
+                </div>
+                <p className="text-blue-700 text-sm mt-3 text-center">
+                  The recipient will need this code to claim their funds
+                </p>
+              </div>
+
+              {/* Notification Status */}
+              <div className={`rounded-xl p-4 border ${result.notificationSent ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-start space-x-3">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${result.notificationSent ? 'bg-green-500' : 'bg-yellow-500'}`}>
+                    {result.notificationSent ? (
+                      <CheckCircle className="w-3 h-3 text-white" />
+                    ) : (
+                      <Info className="w-3 h-3 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-medium ${result.notificationSent ? 'text-green-800' : 'text-yellow-800'}`}>
+                      Notification {result.notificationSent ? 'Sent' : 'Simulated'}
+                    </p>
+                    <p className={`text-sm mt-1 ${result.notificationSent ? 'text-green-700' : 'text-yellow-700'}`}>
+                      {result.notificationSent 
+                        ? `The claim code has been sent to ${result.recipient} via ${result.notificationMethod}.`
+                        : `In production, the claim code would be sent to ${result.recipient} via ${result.notificationMethod}.`
+                      }
+                    </p>
+                  </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Minimum: 0.001 ALGO{isMainNet() ? ' • Maximum: 10 ALGO' : ''}
+
+              {/* Technical Details - Collapsible */}
+              <details className="bg-gray-50 rounded-xl border border-gray-200">
+                <summary className="px-4 py-3 cursor-pointer font-medium text-gray-700 hover:text-gray-900">
+                  Technical Details
+                </summary>
+                <div className="px-4 pb-4 space-y-3">
+                  {result.contractAddress && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm text-gray-600">Smart Contract Address</p>
+                        <button
+                          onClick={() => copyToClipboard(result.contractAddress!, 'contractAddress')}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          {copiedField === 'contractAddress' ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <p className="font-mono text-sm text-gray-700 bg-white px-3 py-2 rounded border break-all">
+                        {result.contractAddress}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {result.applicationId && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Application ID</p>
+                      <p className="font-mono text-sm text-gray-700 bg-white px-3 py-2 rounded border">
+                        {result.applicationId}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm text-gray-600">Transaction ID</p>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => copyToClipboard(result.transactionId, 'transactionId')}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          {copiedField === 'transactionId' ? 'Copied!' : 'Copy'}
+                        </button>
+                        <a
+                          href={getExplorerUrl(result.transactionId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Explorer</span>
+                        </a>
+                      </div>
+                    </div>
+                    <p className="font-mono text-sm text-gray-700 bg-white px-3 py-2 rounded border break-all">
+                      {result.transactionId}
+                    </p>
+                  </div>
+                </div>
+              </details>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  onClick={handleSendAnother}
+                  className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                >
+                  <Send className="w-5 h-5" />
+                  <span>Send Another Payment</span>
+                </button>
+                <a
+                  href={getExplorerUrl(result.transactionId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                  <span>View on Explorer</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Send Form - Hide when showing success */}
+        {step !== 'complete' && (
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-6">
+              <h2 className="text-2xl font-bold text-white">Send Money</h2>
+              <p className="text-blue-100 mt-1">
+                Send Algos to anyone using their email or phone on {getNetworkConfig().name}
               </p>
             </div>
-
-            {/* Recipient Input */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Recipient (Email or Phone)
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                  {getRecipientIcon()}
+            
+            <div className="p-6 space-y-6">
+              {/* Progress Indicator */}
+              {isLoading && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center space-x-3">
+                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+                  <div>
+                    <p className="text-blue-800 font-medium">{getStepMessage()}</p>
+                    {step === 'signing' && (
+                      <p className="text-blue-600 text-sm mt-1">
+                        Check your Pera wallet to approve the transaction
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="email@example.com or +1234567890"
-                  disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            {/* Message Input */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Message (Optional)
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-3 text-gray-400">
-                  <MessageSquare className="w-4 h-4" />
-                </div>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Add a personal message..."
-                  rows={3}
-                  disabled={isLoading}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            {/* Send Button */}
-            <button
-              onClick={handleSend}
-              disabled={isLoading || !walletConnected || step !== 'form'}
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  <span>Send Money</span>
-                </>
               )}
-            </button>
+
+              {/* Amount Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount (ALGO)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    disabled={isLoading}
+                    className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    step="0.001"
+                    min="0.001"
+                    max={isMainNet() ? "10" : undefined}
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                    ALGO
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Minimum: 0.001 ALGO{isMainNet() ? ' • Maximum: 10 ALGO' : ''}
+                </p>
+              </div>
+
+              {/* Recipient Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Recipient (Email or Phone)
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                    {getRecipientIcon()}
+                  </div>
+                  <input
+                    type="text"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="email@example.com or +1234567890"
+                    disabled={isLoading}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              {/* Message Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message (Optional)
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400">
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Add a personal message..."
+                    rows={3}
+                    disabled={isLoading}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              {/* Send Button */}
+              <button
+                onClick={handleSend}
+                disabled={isLoading || !walletConnected || step !== 'form'}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Send Money</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Error Message */}
         {error && (
@@ -460,79 +653,8 @@ function App() {
           </div>
         )}
 
-        {/* Success Result */}
-        {result && (
-          <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <CheckCircle className="w-6 h-6 text-green-500" />
-              <h3 className="text-green-800 font-semibold text-lg">Money Sent Successfully!</h3>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="bg-white rounded-lg p-4 border border-green-200">
-                <p className="text-sm text-gray-600 mb-1">Claim Code</p>
-                <p className="font-mono text-lg font-bold text-gray-900 bg-gray-50 px-3 py-2 rounded border">
-                  {result.claimCode}
-                </p>
-              </div>
-              
-              {result.contractAddress && (
-                <div className="bg-white rounded-lg p-4 border border-green-200">
-                  <p className="text-sm text-gray-600 mb-1">Smart Contract Address</p>
-                  <p className="font-mono text-sm text-gray-700 break-all">
-                    {result.contractAddress}
-                  </p>
-                </div>
-              )}
-              
-              {result.applicationId && (
-                <div className="bg-white rounded-lg p-4 border border-green-200">
-                  <p className="text-sm text-gray-600 mb-1">Application ID</p>
-                  <p className="font-mono text-sm text-gray-700">
-                    {result.applicationId}
-                  </p>
-                </div>
-              )}
-              
-              <div className="bg-white rounded-lg p-4 border border-green-200">
-                <p className="text-sm text-gray-600 mb-1">Transaction ID</p>
-                <div className="flex items-center justify-between">
-                  <p className="font-mono text-sm text-gray-700 break-all flex-1 mr-2">
-                    {result.transactionId}
-                  </p>
-                  <a
-                    href={getExplorerUrl(result.transactionId)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap"
-                  >
-                    View on Explorer →
-                  </a>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-start space-x-2">
-                <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="text-blue-800 font-medium">
-                    Notification {result.notificationSent ? 'sent' : 'simulated'} via {result.notificationMethod}
-                  </p>
-                  <p className="text-blue-700 mt-1">
-                    {result.notificationSent 
-                      ? `The claim code has been sent to ${recipient}. They can use it to claim the funds.`
-                      : `In production, the claim code would be sent to ${recipient} via ${result.notificationMethod}.`
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Wallet Connection Required Notice */}
-        {!walletConnected && !showReconnectPrompt && (
+        {!walletConnected && !showReconnectPrompt && step !== 'complete' && (
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
             <Wallet className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
             <div>
@@ -545,32 +667,34 @@ function App() {
         )}
 
         {/* Network Notice */}
-        <div className={`mt-6 ${isTestNet() ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50 border-orange-200'} border rounded-xl p-4 flex items-start space-x-3`}>
-          <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-500' : 'text-orange-500'} flex-shrink-0 mt-0.5`} />
-          <div>
-            <h3 className={`${isTestNet() ? 'text-yellow-800' : 'text-orange-800'} font-medium`}>
-              {getNetworkConfig().name} Environment
-            </h3>
-            <p className={`${isTestNet() ? 'text-yellow-700' : 'text-orange-700'} text-sm mt-1`}>
-              {isTestNet() ? (
-                <>
-                  This app is running on Algorand TestNet. Use TestNet Algos for testing. 
-                  Get free TestNet Algos from the{' '}
-                  <a 
-                    href={getNetworkConfig().dispenserUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="underline hover:no-underline"
-                  >
-                    Algorand TestNet Dispenser
-                  </a>.
-                </>
-              ) : (
-                'This app is running on Algorand MainNet. Real ALGO will be used for all transactions. Please be careful and double-check all details before sending.'
-              )}
-            </p>
+        {step !== 'complete' && (
+          <div className={`mt-6 ${isTestNet() ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50 border-orange-200'} border rounded-xl p-4 flex items-start space-x-3`}>
+            <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-500' : 'text-orange-500'} flex-shrink-0 mt-0.5`} />
+            <div>
+              <h3 className={`${isTestNet() ? 'text-yellow-800' : 'text-orange-800'} font-medium`}>
+                {getNetworkConfig().name} Environment
+              </h3>
+              <p className={`${isTestNet() ? 'text-yellow-700' : 'text-orange-700'} text-sm mt-1`}>
+                {isTestNet() ? (
+                  <>
+                    This app is running on Algorand TestNet. Use TestNet Algos for testing. 
+                    Get free TestNet Algos from the{' '}
+                    <a 
+                      href={getNetworkConfig().dispenserUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="underline hover:no-underline"
+                    >
+                      Algorand TestNet Dispenser
+                    </a>.
+                  </>
+                ) : (
+                  'This app is running on Algorand MainNet. Real ALGO will be used for all transactions. Please be careful and double-check all details before sending.'
+                )}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
