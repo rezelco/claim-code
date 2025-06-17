@@ -223,12 +223,22 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
       throw new Error('Invalid Algorand address format');
     }
 
+    // Canonicalize the address to ensure it's in the exact format expected by the SDK
+    let canonicalAddress;
+    try {
+      const decodedAddress = algosdk.decodeAddress(trimmedSenderAddress);
+      canonicalAddress = algosdk.encodeAddress(decodedAddress.publicKey);
+    } catch (canonicalizationError) {
+      console.error('Error canonicalizing address:', canonicalizationError);
+      throw new Error('Failed to canonicalize sender address');
+    }
+
     const algodClient = createAlgodClient(network);
     const suggestedParams = await algodClient.getTransactionParams().do();
     
     // Create application creation transaction
     const appCreateTxn = algosdk.makeApplicationCreateTxnFromObject({
-      from: trimmedSenderAddress,
+      from: canonicalAddress,
       suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: compiledProgram,
