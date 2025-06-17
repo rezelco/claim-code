@@ -57,6 +57,9 @@ if (isValidPicaConfig) {
   console.log('📧 Pica/Resend not configured - Email notifications will be simulated');
 }
 
+// In-memory storage for claim codes (in production, use a database)
+const claimStorage = new Map();
+
 // Generate secure random claim code
 function generateClaimCode() {
   return crypto.randomBytes(16).toString('hex').toUpperCase();
@@ -65,6 +68,30 @@ function generateClaimCode() {
 // Hash claim code for smart contract
 function hashClaimCode(code) {
   return crypto.createHash('sha256').update(code).digest();
+}
+
+// Store claim information
+function storeClaim(claimCode, claimData) {
+  claimStorage.set(claimCode, {
+    ...claimData,
+    createdAt: new Date(),
+    claimed: false
+  });
+}
+
+// Get claim information
+function getClaim(claimCode) {
+  return claimStorage.get(claimCode);
+}
+
+// Mark claim as used
+function markClaimAsUsed(claimCode) {
+  const claim = claimStorage.get(claimCode);
+  if (claim) {
+    claim.claimed = true;
+    claim.claimedAt = new Date();
+    claimStorage.set(claimCode, claim);
+  }
 }
 
 // Create PyTEAL-based escrow contract
@@ -582,7 +609,8 @@ app.get('/', (req, res) => {
     endpoints: [
       'GET /api/health',
       'POST /api/create-claim',
-      'POST /api/submit-transaction'
+      'POST /api/submit-transaction',
+      'POST /api/claim-funds'
     ],
     timestamp: new Date().toISOString()
   });
@@ -664,6 +692,17 @@ app.post('/api/create-claim', async (req, res) => {
       network
     );
     console.log(`✅ Deployment transaction created: ${txId}`);
+
+    // Store claim information for later retrieval
+    storeClaim(claimCode, {
+      amount,
+      recipient: recipient.trim(),
+      message: message?.trim(),
+      senderAddress: validatedSenderAddress,
+      network,
+      programHash,
+      hashedClaimCode: hashedClaimCode.toString('hex')
+    });
 
     console.log(`🎉 Deployment transaction created successfully on ${NETWORK_CONFIGS[network].name}:`);
     console.log(`- Claim code: ${claimCode}`);
@@ -875,6 +914,91 @@ app.post('/api/submit-transaction', async (req, res) => {
     console.error('❌ Error submitting transaction:', error);
     res.status(500).json({ 
       error: error.message || 'Failed to submit transaction' 
+    });
+  }
+});
+
+// API endpoint to claim funds
+app.post('/api/claim-funds', async (req, res) => {
+  try {
+    const { claimCode, walletAddress, network = 'testnet' } = req.body;
+    
+    console.log(`📥 Received claim-funds request:`, {
+      claimCode: claimCode ? `${claimCode.substring(0, 8)}...` : 'undefined',
+      walletAddress: walletAddress ? `${walletAddress.substring(0, 8)}...` : 'undefined',
+      network
+    });
+
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+
+    // Validate input
+    if (!claimCode || !claimCode.trim()) {
+      return res.status(400).json({ error: 'Claim code is required' });
+    }
+    
+    if (!walletAddress || !walletAddress.trim()) {
+      return res.status(400).json({ error: 'Wallet address is required' });
+    }
+
+    // Validate wallet address
+    let validatedWalletAddress;
+    try {
+      validatedWalletAddress = validateAlgorandAddress(walletAddress);
+    } catch (addressError) {
+      return res.status(400).json({ error: `Invalid wallet address: ${addressError.message}` });
+    }
+
+    // Get claim information
+    const claimInfo = getClaim(claimCode.trim().toUpperCase());
+    if (!claimInfo) {
+      return res.status(404).json({ error: 'Invalid claim code. Please check your code and try again.' });
+    }
+
+    // Check if already claimed
+    if (claimInfo.claimed) {
+      return res.status(400).json({ error: 'This claim code has already been used.' });
+    }
+
+    // Check if network matches
+    if (claimInfo.network !== network) {
+      return res.status(400).json({ 
+        error: `This claim code is for ${NETWORK_CONFIGS[claimInfo.network].name}, but you're on ${NETWORK_CONFIGS[network].name}. Please switch networks.` 
+      });
+    }
+
+    console.log(`✅ Valid claim found: ${claimInfo.amount} ALGO for ${claimInfo.recipient}`);
+
+    // For now, simulate the claim process since we don't have the full smart contract implementation
+    // In a real implementation, you would:
+    // 1. Find the smart contract using the stored application ID
+    // 2. Create a transaction to call the "claim" method with the claim code hash
+    // 3. Submit the transaction to transfer funds to the wallet address
+
+    // Simulate successful claim
+    const simulatedTxId = `SIM${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
+    
+    // Mark claim as used
+    markClaimAsUsed(claimCode.trim().toUpperCase());
+
+    console.log(`🎉 Claim processed successfully:`);
+    console.log(`- Amount: ${claimInfo.amount} ALGO`);
+    console.log(`- To: ${validatedWalletAddress}`);
+    console.log(`- Simulated Transaction ID: ${simulatedTxId}`);
+
+    res.json({
+      success: true,
+      transactionId: simulatedTxId,
+      amount: claimInfo.amount,
+      message: claimInfo.message || undefined
+    });
+
+  } catch (error) {
+    console.error('❌ Error claiming funds:', error);
+    res.status(500).json({ 
+      error: error.message || 'Internal server error occurred while claiming funds' 
     });
   }
 });
