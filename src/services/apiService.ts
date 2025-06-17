@@ -14,13 +14,23 @@ interface CreateClaimResponse {
   transactionId: string;
   programHash: string;
   deploymentTransaction: string;
-  notificationSent: boolean;
-  notificationMethod: string;
+  claimDetails: {
+    recipient: string;
+    amount: number;
+    message: string;
+    network: string;
+  };
 }
 
 interface SubmitTransactionRequest {
   signedTransaction: string;
   network: string;
+  claimDetails?: {
+    recipient: string;
+    amount: number;
+    message: string;
+    claimCode: string;
+  };
 }
 
 interface SubmitTransactionResponse {
@@ -29,6 +39,8 @@ interface SubmitTransactionResponse {
   applicationId: number;
   contractAddress: string;
   confirmedRound: number;
+  notificationSent?: boolean;
+  notificationMethod?: string;
 }
 
 export const createClaim = async (request: Omit<CreateClaimRequest, 'network'>): Promise<CreateClaimResponse> => {
