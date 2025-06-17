@@ -223,14 +223,12 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
       throw new Error('Invalid Algorand address format');
     }
 
-    // Canonicalize the address to ensure it's in the exact format expected by the SDK
-    let canonicalAddress;
-    try {
-      const decodedAddress = algosdk.decodeAddress(trimmedSenderAddress);
-      canonicalAddress = algosdk.encodeAddress(decodedAddress.publicKey);
-    } catch (canonicalizationError) {
-      console.error('Error canonicalizing address:', canonicalizationError);
-      throw new Error('Failed to canonicalize sender address');
+    // Use the validated address directly instead of trying to canonicalize
+    const canonicalAddress = trimmedSenderAddress;
+    
+    // Additional safety check to ensure canonicalAddress is not null/undefined
+    if (!canonicalAddress || typeof canonicalAddress !== 'string') {
+      throw new Error('Failed to process sender address - address is null or undefined');
     }
 
     const algodClient = createAlgodClient(network);
