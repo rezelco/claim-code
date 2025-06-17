@@ -500,6 +500,80 @@ Network: Algorand ${networkName}`,
   }
 }
 
+// Helper function to safely extract and convert application ID to number
+function extractApplicationId(confirmedTxn) {
+  // Try multiple possible locations for the app ID
+  let rawAppId = confirmedTxn['application-index'] || 
+                 confirmedTxn['applicationIndex'] || 
+                 confirmedTxn.applicationIndex ||
+                 confirmedTxn['app-id'] ||
+                 confirmedTxn.appId;
+  
+  // Check if it's nested in txn or other objects
+  if (!rawAppId && confirmedTxn.txn) {
+    rawAppId = confirmedTxn.txn['application-index'] || 
+               confirmedTxn.txn.applicationIndex ||
+               confirmedTxn.txn['app-id'] ||
+               confirmedTxn.txn.appId;
+  }
+  
+  console.log('📝 Raw application index:', rawAppId, 'type:', typeof rawAppId);
+  
+  // Ensure appId is a proper number - handle all possible types
+  let appId = null;
+  
+  if (rawAppId !== null && rawAppId !== undefined) {
+    if (typeof rawAppId === 'string') {
+      const parsed = parseInt(rawAppId, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        appId = parsed;
+      }
+    } else if (typeof rawAppId === 'bigint') {
+      const converted = Number(rawAppId);
+      if (Number.isSafeInteger(converted) && converted > 0) {
+        appId = converted;
+      }
+    } else if (typeof rawAppId === 'number') {
+      if (Number.isInteger(rawAppId) && rawAppId > 0) {
+        appId = rawAppId;
+      }
+    } else if (typeof rawAppId === 'object' && rawAppId !== null) {
+      // Handle case where rawAppId might be an object with numeric properties
+      // This prevents objects from being passed through
+      console.log('⚠️ Application ID is an object, attempting to extract numeric value:', rawAppId);
+      
+      // Try to find a numeric property that could be the app ID
+      const possibleKeys = ['value', 'id', 'appId', 'applicationId', 'index'];
+      for (const key of possibleKeys) {
+        if (rawAppId[key] !== undefined) {
+          const candidate = rawAppId[key];
+          if (typeof candidate === 'number' && Number.isInteger(candidate) && candidate > 0) {
+            appId = candidate;
+            console.log(`✅ Extracted app ID from object.${key}: ${appId}`);
+            break;
+          } else if (typeof candidate === 'string') {
+            const parsed = parseInt(candidate, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              appId = parsed;
+              console.log(`✅ Extracted and parsed app ID from object.${key}: ${appId}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      // If we still don't have a valid appId, this is an error
+      if (appId === null) {
+        console.error('❌ Could not extract valid app ID from object:', rawAppId);
+      }
+    }
+  }
+  
+  console.log('📝 Parsed application ID:', appId, 'type:', typeof appId);
+  
+  return appId;
+}
+
 // Root endpoint to confirm server is running
 app.get('/', (req, res) => {
   res.json({ 
@@ -731,45 +805,8 @@ app.post('/api/submit-transaction', async (req, res) => {
       typeof value === 'bigint' ? value.toString() : value
     ).substring(0, 500) + '...');
     
-    // Get the application ID from the confirmed transaction
-    // Try multiple possible locations for the app ID
-    let rawAppId = confirmedTxn['application-index'] || 
-                   confirmedTxn['applicationIndex'] || 
-                   confirmedTxn.applicationIndex ||
-                   confirmedTxn['app-id'] ||
-                   confirmedTxn.appId;
-    
-    // Check if it's nested in txn or other objects
-    if (!rawAppId && confirmedTxn.txn) {
-      rawAppId = confirmedTxn.txn['application-index'] || 
-                 confirmedTxn.txn.applicationIndex ||
-                 confirmedTxn.txn['app-id'] ||
-                 confirmedTxn.txn.appId;
-    }
-    
-    // Check logs array for app creation info
-    if (!rawAppId && confirmedTxn.logs) {
-      console.log('📝 Transaction logs:', confirmedTxn.logs);
-    }
-    
-    // Check inner transactions
-    if (!rawAppId && confirmedTxn['inner-txns']) {
-      console.log('📝 Inner transactions count:', confirmedTxn['inner-txns'].length);
-    }
-    
-    console.log('📝 Raw application index:', rawAppId, 'type:', typeof rawAppId);
-    
-    // Ensure appId is a proper number
-    let appId;
-    if (typeof rawAppId === 'string') {
-      appId = parseInt(rawAppId, 10);
-    } else if (typeof rawAppId === 'bigint') {
-      appId = Number(rawAppId);
-    } else {
-      appId = rawAppId;
-    }
-    
-    console.log('📝 Parsed application ID:', appId, 'type:', typeof appId);
+    // Use the helper function to safely extract application ID
+    let appId = extractApplicationId(confirmedTxn);
     
     if (!appId || appId <= 0 || !Number.isInteger(appId)) {
       // Try to get the transaction info directly from the network
@@ -778,21 +815,21 @@ app.post('/api/submit-transaction', async (req, res) => {
         const networkTxInfo = await algodClient.pendingTransactionInformation(txResponse.txId).do();
         console.log('📝 Network transaction info keys:', Object.keys(networkTxInfo));
         
-        const networkAppId = networkTxInfo['application-index'] || 
-                            networkTxInfo.applicationIndex ||
-                            networkTxInfo['app-id'] ||
-                            networkTxInfo.appId;
+        appId = extractApplicationId(networkTxInfo);
         
-        if (networkAppId) {
-          appId = typeof networkAppId === 'string' ? parseInt(networkAppId, 10) : 
-                  typeof networkAppId === 'bigint' ? Number(networkAppId) : networkAppId;
+        if (appId && appId > 0 && Number.isInteger(appId)) {
           console.log('✅ Found application ID from network:', appId);
         } else {
-          throw new Error(`Could not find application ID in transaction. Confirmed transaction keys: ${Object.keys(confirmedTxn)}. Network transaction keys: ${Object.keys(networkTxInfo)}`);
+          throw new Error(`Could not find valid application ID in transaction. Confirmed transaction keys: ${Object.keys(confirmedTxn)}. Network transaction keys: ${Object.keys(networkTxInfo)}`);
         }
       } catch (fetchError) {
-        throw new Error(`Invalid application ID: ${appId} (raw: ${rawAppId}). Could not fetch from network: ${fetchError.message}`);
+        throw new Error(`Invalid application ID: ${appId}. Could not fetch from network: ${fetchError.message}`);
       }
+    }
+    
+    // Ensure appId is definitely a number before using it
+    if (typeof appId !== 'number' || !Number.isInteger(appId) || appId <= 0) {
+      throw new Error(`Application ID must be a positive integer, got: ${appId} (type: ${typeof appId})`);
     }
     
     const appAddress = algosdk.getApplicationAddress(appId);
