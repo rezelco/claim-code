@@ -58,10 +58,10 @@ class SeedWalletService {
     }
 
     try {
-      // Validate mnemonic format
+      // Validate mnemonic format - support both 24 and 25 word mnemonics
       const words = this.seedMnemonic.trim().split(/\s+/);
-      if (words.length !== 25) {
-        console.error('❌ Seed mnemonic must be exactly 25 words');
+      if (!(words.length === 24 || words.length === 25)) {
+        console.error(`❌ Seed mnemonic must be exactly 24 or 25 words, got ${words.length} words`);
         return false;
       }
 
@@ -73,6 +73,7 @@ class SeedWalletService {
       }
 
       console.log(`📝 Seed wallet address: ${account.addr}`);
+      console.log(`📝 Mnemonic word count: ${words.length} words`);
       return true;
     } catch (error) {
       console.error('❌ Error validating seed mnemonic:', error.message);
