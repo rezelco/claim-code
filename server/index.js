@@ -4,6 +4,7 @@ import cors from 'cors';
 import algosdk from 'algosdk';
 import crypto from 'crypto';
 import axios from 'axios';
+import seedWalletService from './services/seedWalletService.js';
 
 const app = express();
 const PORT = 3001;
@@ -957,6 +958,48 @@ app.post('/api/claim-funds', async (req, res) => {
     // Create Algorand client for the network
     const algodClient = createAlgodClient(network);
 
+    // Check if user needs seeding before proceeding with claim
+    console.log('🔍 Checking if user needs seed funding...');
+    try {
+      const needsSeeding = await seedWalletService.needsSeeding(validatedWalletAddress, network, 0.001);
+      
+      if (needsSeeding) {
+        console.log(`💰 User needs seed funding. Attempting to fund ${validatedWalletAddress}...`);
+        
+        const seedResult = await seedWalletService.fundAccount(
+          validatedWalletAddress, 
+          0.004, // 0.004 ALGO for transaction fees
+          network, 
+          claimCode.trim().toUpperCase()
+        );
+        
+        if (seedResult.success) {
+          console.log(`✅ Seed funding successful:`);
+          console.log(`   - Amount: ${seedResult.amount} ALGO`);
+          console.log(`   - TX ID: ${seedResult.transactionId}`);
+          console.log(`   - Remaining seed balance: ${seedResult.seedWalletBalance} ALGO`);
+        } else {
+          console.log(`⚠️ Seed funding failed: ${seedResult.message}`);
+          
+          // For rate limiting, return specific error
+          if (seedResult.reason === 'rate_limited') {
+            return res.status(429).json({ 
+              error: seedResult.message 
+            });
+          }
+          
+          // For other failures, warn but continue with claim attempt
+          console.log('⚠️ Continuing with claim attempt despite seeding failure');
+        }
+      } else {
+        console.log('✅ User has sufficient balance, no seeding needed');
+      }
+    } catch (seedError) {
+      console.error('❌ Error during seeding check/attempt:', seedError);
+      // Continue with claim attempt even if seeding fails
+      console.log('⚠️ Continuing with claim attempt despite seeding error');
+    }
+
     // Check claimer's balance - warn but don't block if low
     try {
       const claimerInfo = await algodClient.accountInformation(validatedWalletAddress).do();
@@ -964,7 +1007,7 @@ app.post('/api/claim-funds', async (req, res) => {
       console.log(`💰 Claimer balance: ${Number(claimerBalance) / 1000000} ALGO (${claimerBalance.toString()} microAlgos)`);
       
       if (claimerBalance < 1000n) { // Need at least 0.001 ALGO for transaction fee
-        console.log('⚠️ Claimer has low balance, but attempting claim anyway');
+        console.log('⚠️ Claimer still has low balance after seeding attempt');
       }
     } catch (balanceError) {
       console.error('❌ Error checking claimer balance:', balanceError);
@@ -1297,6 +1340,9 @@ app.get('/api/health', async (req, res) => {
     const algodClient = createAlgodClient(network);
     const status = await algodClient.status().do();
     
+    // Check seed wallet status
+    const seedWalletStatus = await seedWalletService.checkSeedWalletBalance(network);
+    
     res.json({ 
       status: 'OK', 
       timestamp: new Date().toISOString(),
@@ -1306,7 +1352,14 @@ app.get('/api/health', async (req, res) => {
         lastRound: status['last-round']
       },
       services: {
-        email: isValidPicaConfig ? 'connected' : 'simulated'
+        email: isValidPicaConfig ? 'connected' : 'simulated',
+        seedWallet: seedWalletStatus.configured ? {
+          status: 'configured',
+          address: seedWalletStatus.address,
+          balance: `${seedWalletStatus.balance} ALGO`
+        } : {
+          status: 'not_configured'
+        }
       }
     });
   } catch (error) {
@@ -1368,6 +1421,21 @@ app.post('/api/debug/clear-incomplete-claims', (req, res) => {
   }
 });
 
+// Debug endpoint to check seed wallet status
+app.get('/api/debug/seed-wallet', async (req, res) => {
+  try {
+    const network = req.query.network || 'testnet';
+    const seedWalletStatus = await seedWalletService.checkSeedWalletBalance(network);
+    
+    res.json({
+      seedWallet: seedWalletStatus,
+      isConfigured: seedWalletStatus.configured
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 RandCash API server running on port ${PORT}`);
   console.log(`Supported networks:`);
@@ -1376,4 +1444,5 @@ app.listen(PORT, () => {
   });
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
   console.log(`📧 Pica/Resend Email: ${isValidPicaConfig ? 'Configured' : 'Not configured (will simulate)'}`);
+  console.log(`💰 Seed Wallet: ${seedWalletService.isConfigured ? 'Configured' : 'Not configured (seeding will be skipped)'}`);
 });

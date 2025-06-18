@@ -162,8 +162,8 @@ function App() {
       setError('Please enter a valid amount');
       return false;
     }
-    if (parseFloat(amount) < 0.2) {
-      setError('Minimum amount is 0.2 ALGO (to cover network fees)');
+    if (parseFloat(amount) < 0.204) {
+      setError('Minimum amount is 0.204 ALGO (includes seed funding for recipients with zero balance)');
       return false;
     }
     if (!recipient.trim()) {
@@ -266,10 +266,10 @@ function App() {
       
       let fundingTransactionId: string | undefined;
       try {
-        // Create funding transaction with minimum balance + claim amount + fees
-        // Contract needs: 0.1 ALGO minimum balance + claim amount + 0.001 for fees
-        const fundingAmount = 0.1 + parseFloat(amount) + 0.001;
-        console.log(`Creating funding transaction for ${fundingAmount} ALGO (0.1 min balance + ${amount} claim + 0.001 fees)`);
+        // Create funding transaction with minimum balance + claim amount + fees + seed funding
+        // Contract needs: 0.1 ALGO minimum balance + claim amount + 0.001 for fees + 0.004 for potential seeding
+        const fundingAmount = 0.1 + parseFloat(amount) + 0.005; // Increased from 0.001 to 0.005 for seeding
+        console.log(`Creating funding transaction for ${fundingAmount} ALGO (0.1 min balance + ${amount} claim + 0.005 fees/seeding)`);
         
         const fundingTxn = await fundContract({
           applicationId: submitResponse.applicationId,
@@ -691,11 +691,11 @@ function App() {
                         type="number"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.20"
+                        placeholder="0.204"
                         disabled={isLoading}
                         className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
-                        step="0.01"
-                        min="0.2"
+                        step="0.001"
+                        min="0.204"
                         max={isMainNet() ? "10" : undefined}
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
@@ -706,12 +706,12 @@ function App() {
                       <div className="flex items-center space-x-1">
                         <Info className="w-4 h-4 text-blue-500" />
                         <span>
-                          Minimum 0.2 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.101).toFixed(3) : '0.301'} ALGO 
-                          (includes ~0.101 ALGO for network fees)
+                          Minimum 0.204 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.105).toFixed(3) : '0.309'} ALGO 
+                          (includes ~0.105 ALGO for network fees and seed funding)
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Recipient receives the full amount you enter
+                        Recipient receives the full amount you enter. Includes automatic seed funding for zero-balance wallets.
                       </p>
                     </div>
                     {isMainNet() && (
@@ -909,7 +909,7 @@ function App() {
                       className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter the claim code you received to claim your funds
+                      Enter the claim code you received to claim your funds. Don't worry if your wallet has zero balance - we'll automatically add seed funding if needed.
                     </p>
                   </div>
 
