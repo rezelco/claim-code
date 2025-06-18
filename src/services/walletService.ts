@@ -165,7 +165,7 @@ class WalletService {
     return this.account;
   }
 
-  async signTransaction(transaction: algosdk.Transaction): Promise<Uint8Array> {
+  async signTransaction(transaction: algosdk.Transaction | string): Promise<Uint8Array> {
     if (!this.connected) {
       throw new Error('Wallet not connected');
     }
@@ -175,8 +175,36 @@ class WalletService {
         throw new Error('Pera wallet not available for signing');
       }
 
+      // Validate transaction input
+      if (!transaction) {
+        throw new Error('Transaction is required but was undefined or null');
+      }
+
+      // If transaction is a base64 string, decode it first
+      let txn: algosdk.Transaction;
+      if (typeof transaction === 'string') {
+        if (transaction.trim() === '') {
+          throw new Error('Transaction string is empty');
+        }
+        
+        console.log('🔍 [Wallet] Decoding transaction string, length:', transaction.length);
+        console.log('🔍 [Wallet] Transaction string preview:', transaction.substring(0, 50) + '...');
+        
+        try {
+          const decodedTxn = new Uint8Array(Buffer.from(transaction, 'base64'));
+          txn = algosdk.decodeUnsignedTransaction(decodedTxn);
+          console.log('✅ [Wallet] Transaction decoded successfully');
+        } catch (decodeError) {
+          console.error('❌ [Wallet] Error decoding transaction:', decodeError);
+          throw new Error(`Failed to decode transaction: ${decodeError instanceof Error ? decodeError.message : 'Unknown error'}`);
+        }
+      } else {
+        console.log('🔍 [Wallet] Using transaction object directly');
+        txn = transaction;
+      }
+
       const txnToSign = [{
-        txn: transaction,
+        txn: txn,
         signers: [this.account]
       }];
       const signedTxns = await this.peraWallet.signTransaction([txnToSign]);
@@ -198,5 +226,5 @@ export const connectWallet = () => walletService.connectWallet();
 export const disconnectWallet = () => walletService.disconnectWallet();
 export const isWalletConnected = () => walletService.isWalletConnected();
 export const getConnectedAccount = () => walletService.getConnectedAccount();
-export const signTransaction = (transaction: algosdk.Transaction) => walletService.signTransaction(transaction);
+export const signTransaction = (transaction: algosdk.Transaction | string) => walletService.signTransaction(transaction);
 export const getWalletType = () => walletService.getWalletType();
