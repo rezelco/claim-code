@@ -200,7 +200,7 @@ byte "claimed"
 int 1
 app_global_put
 
-// Transfer funds to claimer
+// Transfer funds to claimer with fee paid by contract
 itxn_begin
 int pay
 itxn_field TypeEnum
@@ -209,6 +209,11 @@ itxn_field Receiver
 byte "amount"
 app_global_get
 itxn_field Amount
+int 1000
+itxn_field Fee
+// Send remaining balance (min balance) back to claimer as well
+txn Sender
+itxn_field CloseRemainderTo
 itxn_submit
 
 int 1
@@ -396,12 +401,14 @@ async function deployContract(compiledProgram, senderAddress, claimHash, amount,
 
     console.log('✅ Application transaction created successfully');
     
+    // For now, return just the app creation transaction
+    // We'll handle funding after the app is created and we know the real app ID
+    
     // Get transaction ID
     let txId;
     try {
       txId = appCreateTxn.txID();
       console.log(`  - Transaction ID: ${txId}`);
-      console.log(`  - Transaction ID type: ${typeof txId}`);
     } catch (txIdError) {
       console.error('❌ Error getting transaction ID:', txIdError);
       throw new Error('Failed to get transaction ID from created transaction');
@@ -701,7 +708,10 @@ app.post('/api/create-claim', async (req, res) => {
       senderAddress: validatedSenderAddress,
       network,
       programHash,
-      hashedClaimCode: hashedClaimCode.toString('hex')
+      hashedClaimCode: hashedClaimCode.toString('hex'),
+      txId: txId, // Store the deployment transaction ID
+      applicationId: null, // Will be updated after deployment
+      contractAddress: null // Will be updated after deployment
     });
 
     console.log(`🎉 Deployment transaction created successfully on ${NETWORK_CONFIGS[network].name}:`);
@@ -722,7 +732,8 @@ app.post('/api/create-claim', async (req, res) => {
         recipient,
         amount,
         message,
-        network
+        network,
+        claimCode // Add claim code so we can update storage after deployment
       }
     });
 
@@ -734,10 +745,10 @@ app.post('/api/create-claim', async (req, res) => {
   }
 });
 
-// API endpoint to submit signed transaction
+// API endpoint to submit signed transaction (atomic group)
 app.post('/api/submit-transaction', async (req, res) => {
   try {
-    const { signedTransaction, network = 'testnet', claimDetails } = req.body;
+    const { signedTransaction, signedTransactions, network = 'testnet', claimDetails } = req.body;
     
     console.log(`📥 Received submit-transaction request for ${NETWORK_CONFIGS[network]?.name || network}`);
     
@@ -746,140 +757,93 @@ app.post('/api/submit-transaction', async (req, res) => {
       return res.status(400).json({ error: 'Invalid network specified' });
     }
     
-    if (!signedTransaction) {
-      return res.status(400).json({ error: 'Signed transaction is required' });
+    // Support both single transaction (legacy) and atomic groups
+    if (!signedTransaction && !signedTransactions) {
+      return res.status(400).json({ error: 'Signed transaction or transaction group is required' });
     }
 
     const algodClient = createAlgodClient(network);
 
-    // Decode and submit the signed transaction
-    console.log('📤 Submitting signed transaction to network...');
-    const signedTxnBuffer = Buffer.from(signedTransaction, 'base64');
-    
-    // Log transaction details before submission
-    console.log(`📝 Transaction buffer length: ${signedTxnBuffer.length} bytes`);
-    
     let txResponse;
+    let isAtomic = false;
+    let primaryTxId;
+
     try {
-      txResponse = await algodClient.sendRawTransaction(signedTxnBuffer).do();
-      console.log(`✅ Transaction submitted successfully`);
-      console.log(`   - Full response:`, JSON.stringify(txResponse));
-      console.log(`   - Response type:`, typeof txResponse);
-      console.log(`   - Response keys:`, Object.keys(txResponse || {}));
-      console.log(`   - Transaction ID: ${txResponse?.txId}`);
-      console.log(`   - Transaction ID type: ${typeof txResponse?.txId}`);
-      console.log(`   - Transaction ID length: ${txResponse?.txId?.length}`);
-    } catch (submitError) {
-      console.error('❌ Failed to submit transaction:', submitError);
-      
-      // Try to decode the transaction to see what we're sending
-      try {
-        const decodedTxn = algosdk.decodeSignedTransaction(signedTxnBuffer);
-        console.error('Decoded transaction:', {
-          txnType: decodedTxn.txn.type,
-          sender: decodedTxn.txn.sender,
-          fee: decodedTxn.txn.fee,
-          hasSignature: !!decodedTxn.sig
+      if (signedTransactions && Array.isArray(signedTransactions)) {
+        // Handle atomic transaction group
+        isAtomic = true;
+        console.log('📤 Submitting atomic transaction group to network...');
+        console.log(`📝 Group contains ${signedTransactions.length} transactions`);
+        
+        // Decode all signed transactions
+        const signedTxnBuffers = signedTransactions.map((txn, index) => {
+          const buffer = Buffer.from(txn, 'base64');
+          console.log(`📝 Transaction ${index}: ${buffer.length} bytes`);
+          return buffer;
         });
-      } catch (decodeError) {
-        console.error('Could not decode transaction:', decodeError.message);
+        
+        // Submit the atomic group
+        txResponse = await algodClient.sendRawTransaction(signedTxnBuffers).do();
+        
+        // For atomic groups, use the first transaction ID as primary
+        primaryTxId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
+      } else {
+        // Handle single transaction (legacy)
+        console.log('📤 Submitting single signed transaction to network...');
+        const signedTxnBuffer = Buffer.from(signedTransaction, 'base64');
+        console.log(`📝 Transaction buffer length: ${signedTxnBuffer.length} bytes`);
+        
+        txResponse = await algodClient.sendRawTransaction(signedTxnBuffer).do();
+        primaryTxId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
       }
       
+      console.log(`✅ ${isAtomic ? 'Atomic group' : 'Transaction'} submitted successfully`);
+      console.log(`   - Primary Transaction ID: ${primaryTxId}`);
+    } catch (submitError) {
+      console.error('❌ Failed to submit transaction:', submitError);
       throw new Error(`Transaction submission failed: ${submitError.message}`);
     }
     
-    // Validate transaction ID - check different possible response formats
-    // Note: algosdk v3 returns 'txid' (lowercase) not 'txId'
-    const txId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
-    if (!txId) {
+    // Validate transaction ID
+    if (!primaryTxId) {
       console.error('❌ No transaction ID found in response:', txResponse);
       throw new Error('No transaction ID returned from submission');
     }
     
-    // Normalize to use txId for consistency
-    txResponse.txId = txId;
-    console.log(`📝 Transaction ID found: ${txId}`);
-    
-    // Wait for confirmation with more rounds and better error handling
+    // Wait for confirmation
     console.log('⏳ Waiting for transaction confirmation...');
-    let confirmedTxn;
-    let lastStatus = '';
+    const confirmedTxn = await algosdk.waitForConfirmation(algodClient, primaryTxId, 15);
+    console.log(`✅ ${isAtomic ? 'Atomic group' : 'Transaction'} confirmed in round ${confirmedTxn['confirmed-round']}`);
+
+    // Extract application ID for atomic groups (from the first transaction which is app creation)
+    let appId = null;
+    let contractAddress = null;
     
-    try {
-      // Simplified wait logic - just use the built-in algosdk function
-      console.log('Using algosdk.waitForConfirmation with 15 rounds...');
-      confirmedTxn = await algosdk.waitForConfirmation(algodClient, txResponse.txId, 15);
-      console.log(`✅ Transaction confirmed in round ${confirmedTxn['confirmed-round']}`);
-      
-    } catch (waitError) {
-      console.error('⚠️ Standard wait failed, trying manual check...');
-      
-      // Manual check if algosdk.waitForConfirmation fails
-      try {
-        const txInfo = await algodClient.pendingTransactionInformation(txResponse.txId).do();
-        if (txInfo['confirmed-round']) {
-          console.log(`✅ Transaction was actually confirmed in round ${txInfo['confirmed-round']}`);
-          confirmedTxn = txInfo;
-        } else {
-          // Try to get current node status for better error message
-          let currentRound = 'unknown';
-          try {
-            const status = await algodClient.status().do();
-            currentRound = status['last-round'];
-          } catch (statusError) {
-            console.error('Could not get node status:', statusError.message);
-          }
-          
-          const poolError = txInfo['pool-error'] || 'none';
-          throw new Error(`Transaction not confirmed. Current round: ${currentRound}, Pool error: ${poolError}, Wait error: ${waitError.message}`);
-        }
-      } catch (infoError) {
-        throw new Error(`Transaction confirmation failed: ${waitError.message}. Could not get transaction info: ${infoError.message}`);
+    if (isAtomic) {
+      // For atomic groups, extract app ID from confirmed transaction
+      appId = extractApplicationId(confirmedTxn);
+      if (appId && appId > 0) {
+        contractAddress = algosdk.getApplicationAddress(appId).toString();
+        console.log(`✅ App created with ID: ${appId}, Address: ${contractAddress}`);
+      }
+    } else {
+      // Legacy single transaction handling
+      appId = extractApplicationId(confirmedTxn);
+      if (appId && appId > 0) {
+        contractAddress = algosdk.getApplicationAddress(appId).toString();
       }
     }
-    
-    // Debug: log the entire confirmed transaction structure
-    console.log('📝 Confirmed transaction keys:', Object.keys(confirmedTxn));
-    console.log('📝 Confirmed transaction sample:', JSON.stringify(confirmedTxn, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value
-    ).substring(0, 500) + '...');
-    
-    // Use the helper function to safely extract application ID
-    let appId = extractApplicationId(confirmedTxn);
-    
-    if (!appId || appId <= 0 || !Number.isInteger(appId)) {
-      // Try to get the transaction info directly from the network
-      console.log('⚠️ Application ID not found in confirmation, trying to fetch transaction details...');
-      try {
-        const networkTxInfo = await algodClient.pendingTransactionInformation(txResponse.txId).do();
-        console.log('📝 Network transaction info keys:', Object.keys(networkTxInfo));
-        
-        appId = extractApplicationId(networkTxInfo);
-        
-        if (appId && appId > 0 && Number.isInteger(appId)) {
-          console.log('✅ Found application ID from network:', appId);
-        } else {
-          throw new Error(`Could not find valid application ID in transaction. Confirmed transaction keys: ${Object.keys(confirmedTxn)}. Network transaction keys: ${Object.keys(networkTxInfo)}`);
-        }
-      } catch (fetchError) {
-        throw new Error(`Invalid application ID: ${appId}. Could not fetch from network: ${fetchError.message}`);
+
+    // Update claim storage with actual application ID and contract address for both atomic and non-atomic
+    if (claimDetails && claimDetails.claimCode && appId) {
+      const claimInfo = getClaim(claimDetails.claimCode);
+      if (claimInfo) {
+        claimInfo.applicationId = appId;
+        claimInfo.contractAddress = contractAddress;
+        storeClaim(claimDetails.claimCode, claimInfo);
+        console.log(`✅ Updated claim storage with actual app ID ${appId} (${isAtomic ? 'atomic' : 'non-atomic'})`);
       }
     }
-    
-    // Ensure appId is definitely a number before using it
-    if (typeof appId !== 'number' || !Number.isInteger(appId) || appId <= 0) {
-      throw new Error(`Application ID must be a positive integer, got: ${appId} (type: ${typeof appId})`);
-    }
-    
-    // Convert the Address object to string before sending to frontend
-    const appAddress = algosdk.getApplicationAddress(appId);
-    const contractAddressString = appAddress.toString();
-    
-    console.log(`🎉 Contract deployed successfully on ${NETWORK_CONFIGS[network].name}:`);
-    console.log(`- Application ID: ${appId}`);
-    console.log(`- Contract Address: ${contractAddressString}`);
-    console.log(`- Transaction ID: ${txResponse.txId}`);
-    console.log(`- Confirmed Round: ${confirmedTxn['confirmed-round']}`);
 
     // Send email notification if claim details are provided
     let notificationResult = { success: false, method: 'not_attempted' };
@@ -896,18 +860,19 @@ app.post('/api/submit-transaction', async (req, res) => {
         console.log(`✅ Email notification: ${notificationResult.success ? 'sent' : 'failed'}`);
       } catch (emailError) {
         console.error('❌ Failed to send email notification:', emailError);
-        // Don't fail the whole request if email fails - contract is already deployed
+        // Don't fail the whole request if email fails - atomic group is already confirmed
       }
     }
 
     res.json({
       success: true,
-      transactionId: txResponse.txId,
+      transactionId: primaryTxId,
       applicationId: appId,
-      contractAddress: contractAddressString, // Send as string instead of Address object
+      contractAddress: contractAddress,
       confirmedRound: confirmedTxn['confirmed-round'],
       notificationSent: notificationResult.success,
-      notificationMethod: notificationResult.method
+      notificationMethod: notificationResult.method,
+      isAtomic: isAtomic
     });
 
   } catch (error) {
@@ -970,35 +935,350 @@ app.post('/api/claim-funds', async (req, res) => {
     }
 
     console.log(`✅ Valid claim found: ${claimInfo.amount} ALGO for ${claimInfo.recipient}`);
-
-    // For now, simulate the claim process since we don't have the full smart contract implementation
-    // In a real implementation, you would:
-    // 1. Find the smart contract using the stored application ID
-    // 2. Create a transaction to call the "claim" method with the claim code hash
-    // 3. Submit the transaction to transfer funds to the wallet address
-
-    // Simulate successful claim
-    const simulatedTxId = `SIM${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
-    
-    // Mark claim as used
-    markClaimAsUsed(claimCode.trim().toUpperCase());
-
-    console.log(`🎉 Claim processed successfully:`);
-    console.log(`- Amount: ${claimInfo.amount} ALGO`);
-    console.log(`- To: ${validatedWalletAddress}`);
-    console.log(`- Simulated Transaction ID: ${simulatedTxId}`);
-
-    res.json({
-      success: true,
-      transactionId: simulatedTxId,
+    console.log(`📝 Claim info details:`, {
+      applicationId: claimInfo.applicationId,
+      contractAddress: claimInfo.contractAddress,
       amount: claimInfo.amount,
-      message: claimInfo.message || undefined
+      network: claimInfo.network,
+      hasClaimHash: !!claimInfo.hashedClaimCode,
+      hasFundingTxId: !!claimInfo.fundingTxId,
+      txId: claimInfo.txId?.substring(0, 10) + '...',
+      fundingTxId: claimInfo.fundingTxId?.substring(0, 10) + '...' || 'None',
+      createdAt: claimInfo.createdAt
+    });
+
+    // Check if we have the application ID
+    if (!claimInfo.applicationId) {
+      return res.status(400).json({ 
+        error: 'Contract not yet deployed. Please wait for the sender to complete the transaction first.' 
+      });
+    }
+
+    // Create Algorand client for the network
+    const algodClient = createAlgodClient(network);
+
+    // Check claimer's balance - warn but don't block if low
+    try {
+      const claimerInfo = await algodClient.accountInformation(validatedWalletAddress).do();
+      const claimerBalance = typeof claimerInfo.amount === 'bigint' ? claimerInfo.amount : BigInt(claimerInfo.amount);
+      console.log(`💰 Claimer balance: ${Number(claimerBalance) / 1000000} ALGO (${claimerBalance.toString()} microAlgos)`);
+      
+      if (claimerBalance < 1000n) { // Need at least 0.001 ALGO for transaction fee
+        console.log('⚠️ Claimer has low balance, but attempting claim anyway');
+      }
+    } catch (balanceError) {
+      console.error('❌ Error checking claimer balance:', balanceError);
+    }
+
+    // Check contract balance before proceeding
+    try {
+      const appAddress = algosdk.getApplicationAddress(claimInfo.applicationId);
+      console.log(`🔍 Checking balance for App ID ${claimInfo.applicationId} at address ${appAddress}`);
+      
+      const accountInfo = await algodClient.accountInformation(appAddress).do();
+      const contractBalance = typeof accountInfo.amount === 'bigint' ? accountInfo.amount : BigInt(accountInfo.amount);
+      console.log(`📊 Contract balance: ${Number(contractBalance) / 1000000} ALGO (${contractBalance.toString()} microAlgos)`);
+      
+      if (contractBalance === 0n) {
+        console.log(`❌ Contract at ${appAddress} has 0 balance!`);
+        console.log(`   App ID: ${claimInfo.applicationId}`);
+        console.log(`   Expected amount: ${claimInfo.amount} ALGO`);
+        console.log(`   Has funding TX ID: ${!!claimInfo.fundingTxId}`);
+        console.log(`   Claim created: ${claimInfo.createdAt}`);
+        
+        // Provide different error messages based on whether this was atomic or not
+        const errorMessage = claimInfo.fundingTxId 
+          ? `Contract was not funded properly during creation. This may be an old claim code created before atomic transactions were enabled. Please ask the sender to create a new claim.`
+          : `Contract has not been funded yet. This claim was created but the funding step failed. Please ask the sender to try sending again.`;
+          
+        return res.status(400).json({
+          error: errorMessage,
+          contractAddress: appAddress.toString(),
+          applicationId: claimInfo.applicationId
+        });
+      }
+      
+      // Check if contract has enough to pay the claim amount + fee
+      const claimAmountMicroAlgos = BigInt(Math.floor(claimInfo.amount * 1000000));
+      const requiredAmount = claimAmountMicroAlgos + 1000n; // Amount + fee for inner tx
+      if (contractBalance < requiredAmount) {
+        return res.status(400).json({
+          error: `Contract has insufficient funds. Has ${Number(contractBalance) / 1000000} ALGO but needs ${Number(requiredAmount) / 1000000} ALGO (${claimInfo.amount} + 0.001 for fees).`
+        });
+      }
+    } catch (balanceError) {
+      console.error('❌ Error checking contract balance:', balanceError);
+      return res.status(500).json({
+        error: 'Unable to verify contract balance. Please try again later.'
+      });
+    }
+
+    // Get suggested parameters
+    let suggestedParams;
+    try {
+      suggestedParams = await algodClient.getTransactionParams().do();
+    } catch (paramError) {
+      console.error('❌ Failed to fetch transaction parameters:', paramError);
+      throw new Error(`Network connection failed: ${paramError.message}`);
+    }
+
+    // Create application call transaction to claim funds
+    console.log('📝 Creating claim transaction...');
+    const claimHash = hashClaimCode(claimCode.trim().toUpperCase());
+    
+    const appArgs = [
+      new TextEncoder().encode('claim'),
+      claimHash
+    ];
+
+    // Use minimum fee - we'll implement fee sponsorship in future
+    // For now, the claimer needs minimal ALGO for fees
+
+    const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
+      sender: validatedWalletAddress,
+      suggestedParams: suggestedParams,
+      appIndex: claimInfo.applicationId,
+      onComplete: algosdk.OnApplicationComplete.NoOpOC,
+      appArgs: appArgs
+    });
+
+    // Encode the transaction for signing
+    const txnToSign = Buffer.from(algosdk.encodeUnsignedTransaction(appCallTxn)).toString('base64');
+
+    console.log(`✅ Claim transaction created for app ${claimInfo.applicationId}`);
+    console.log(`- Claimer: ${validatedWalletAddress}`);
+    console.log(`- Amount: ${claimInfo.amount} ALGO`);
+
+    // For now, return the transaction to be signed by the frontend
+    // The frontend will sign and submit it back
+    res.json({
+      success: false, // Not yet complete - needs signing
+      requiresSigning: true,
+      transactionToSign: txnToSign,
+      amount: claimInfo.amount,
+      message: claimInfo.message,
+      claimCode: claimCode.trim().toUpperCase()
     });
 
   } catch (error) {
     console.error('❌ Error claiming funds:', error);
     res.status(500).json({ 
       error: error.message || 'Internal server error occurred while claiming funds' 
+    });
+  }
+});
+
+// API endpoint to submit signed claim transaction
+app.post('/api/submit-claim', async (req, res) => {
+  try {
+    const { signedTransaction, claimCode, network = 'testnet' } = req.body;
+    
+    console.log(`📥 Received submit-claim request for claim code ${claimCode?.substring(0, 8)}...`);
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    if (!signedTransaction) {
+      return res.status(400).json({ error: 'Signed transaction is required' });
+    }
+
+    if (!claimCode) {
+      return res.status(400).json({ error: 'Claim code is required' });
+    }
+
+    // Get claim information
+    const claimInfo = getClaim(claimCode.trim().toUpperCase());
+    if (!claimInfo) {
+      return res.status(404).json({ error: 'Invalid claim code' });
+    }
+
+    // Check if already claimed
+    if (claimInfo.claimed) {
+      return res.status(400).json({ error: 'This claim code has already been used.' });
+    }
+
+    // Create Algorand client
+    const algodClient = createAlgodClient(network);
+
+    // Decode and submit the signed transaction
+    console.log('📤 Submitting claim transaction to Algorand network...');
+    const signedTxnBytes = new Uint8Array(Buffer.from(signedTransaction, 'base64'));
+    const txResponse = await algodClient.sendRawTransaction(signedTxnBytes).do();
+    
+    // Extract transaction ID - handle different response formats
+    const txId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
+    
+    if (!txId) {
+      console.error('❌ No transaction ID in response:', txResponse);
+      throw new Error('No valid transaction ID was specified by the network');
+    }
+    
+    console.log(`✅ Claim transaction submitted successfully: ${txId}`);
+    
+    // Wait for confirmation
+    console.log('⏳ Waiting for transaction confirmation...');
+    const confirmedTxn = await algosdk.waitForConfirmation(algodClient, txId, 15);
+    
+    console.log(`✅ Claim transaction confirmed in round ${confirmedTxn['confirmed-round']}`);
+
+    // Mark claim as used
+    markClaimAsUsed(claimCode.trim().toUpperCase());
+
+    console.log(`🎉 Claim processed successfully:`);
+    console.log(`- Amount: ${claimInfo.amount} ALGO`);
+    console.log(`- Transaction ID: ${txId}`);
+
+    res.json({
+      success: true,
+      transactionId: txId,
+      amount: claimInfo.amount,
+      confirmedRound: confirmedTxn['confirmed-round'],
+      message: claimInfo.message
+    });
+
+  } catch (error) {
+    console.error('❌ Error submitting claim transaction:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to submit claim transaction' 
+    });
+  }
+});
+
+// API endpoint to submit a simple signed transaction (for funding)
+app.post('/api/submit-funding-transaction', async (req, res) => {
+  try {
+    const { signedTransaction, network = 'testnet', claimCode } = req.body;
+    
+    console.log(`📥 Received funding transaction submission`);
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    if (!signedTransaction) {
+      return res.status(400).json({ error: 'Signed transaction is required' });
+    }
+
+    // Create Algorand client
+    const algodClient = createAlgodClient(network);
+
+    // Decode and submit the signed transaction
+    console.log('📤 Submitting funding transaction to Algorand network...');
+    const signedTxnBytes = new Uint8Array(Buffer.from(signedTransaction, 'base64'));
+    const txResponse = await algodClient.sendRawTransaction(signedTxnBytes).do();
+    
+    // Extract transaction ID
+    const txId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
+    
+    if (!txId) {
+      console.error('❌ No transaction ID in response:', txResponse);
+      throw new Error('No valid transaction ID was specified by the network');
+    }
+    
+    console.log(`✅ Funding transaction submitted successfully: ${txId}`);
+    
+    // Wait for confirmation
+    console.log('⏳ Waiting for transaction confirmation...');
+    const confirmedTxn = await algosdk.waitForConfirmation(algodClient, txId, 15);
+    
+    console.log(`✅ Funding transaction confirmed in round ${confirmedTxn['confirmed-round']}`);
+
+    // Update claim storage with funding transaction ID if claim code provided
+    if (claimCode) {
+      const claimInfo = getClaim(claimCode);
+      if (claimInfo) {
+        claimInfo.fundingTxId = txId;
+        storeClaim(claimCode, claimInfo);
+        console.log(`✅ Updated claim storage with funding TX ID ${txId}`);
+      } else {
+        console.log(`⚠️ Could not find claim for code ${claimCode} to update funding TX ID`);
+      }
+    }
+
+    res.json({
+      success: true,
+      transactionId: txId,
+      confirmedRound: confirmedTxn['confirmed-round']
+    });
+
+  } catch (error) {
+    console.error('❌ Error submitting funding transaction:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to submit funding transaction' 
+    });
+  }
+});
+
+// API endpoint to fund contract after creation
+app.post('/api/fund-contract', async (req, res) => {
+  try {
+    const { applicationId, amount, senderAddress, network = 'testnet' } = req.body;
+    
+    console.log(`📥 Received fund-contract request for app ${applicationId}`);
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    // Validate inputs
+    if (!applicationId || applicationId <= 0) {
+      return res.status(400).json({ error: 'Valid application ID is required' });
+    }
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+    
+    // Validate sender address
+    let validatedSenderAddress;
+    try {
+      validatedSenderAddress = validateAlgorandAddress(senderAddress);
+    } catch (addressError) {
+      return res.status(400).json({ error: `Invalid sender address: ${addressError.message}` });
+    }
+    
+    // Create Algorand client
+    const algodClient = createAlgodClient(network);
+    
+    // Get suggested parameters
+    const suggestedParams = await algodClient.getTransactionParams().do();
+    
+    // Get the application address
+    const appAddress = algosdk.getApplicationAddress(applicationId);
+    console.log(`📝 Contract address: ${appAddress}`);
+    
+    // Create payment transaction to fund the contract
+    const fundingTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+      sender: validatedSenderAddress,
+      receiver: appAddress,
+      amount: Math.floor(amount * 1000000), // Convert ALGO to microAlgos
+      suggestedParams: suggestedParams,
+      note: new TextEncoder().encode('RandCash contract funding')
+    });
+    
+    // Encode transaction for signing
+    const txnToSign = Buffer.from(algosdk.encodeUnsignedTransaction(fundingTxn)).toString('base64');
+    const txId = fundingTxn.txID();
+    
+    console.log(`✅ Funding transaction created:`);
+    console.log(`- Amount: ${amount} ALGO`);
+    console.log(`- To contract: ${appAddress}`);
+    console.log(`- Transaction ID: ${txId}`);
+    
+    res.json({
+      transactionToSign: txnToSign,
+      transactionId: txId,
+      contractAddress: appAddress.toString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error creating funding transaction:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to create funding transaction' 
     });
   }
 });
@@ -1035,6 +1315,56 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       error: error.message 
     });
+  }
+});
+
+// Debug endpoint to check claim status (only for development)
+app.get('/api/debug/claims', (req, res) => {
+  try {
+    const claims = Array.from(claimStorage.entries()).map(([code, data]) => ({
+      code: code.substring(0, 8) + '...',
+      amount: data.amount,
+      recipient: data.recipient,
+      applicationId: data.applicationId,
+      contractAddress: data.contractAddress,
+      claimed: data.claimed,
+      fundingTxId: data.fundingTxId ? data.fundingTxId.substring(0, 10) + '...' : null,
+      createdAt: data.createdAt,
+      network: data.network
+    }));
+    
+    res.json({
+      totalClaims: claims.length,
+      claims: claims
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Debug endpoint to clear incomplete claims (only for development)
+app.post('/api/debug/clear-incomplete-claims', (req, res) => {
+  try {
+    let removed = 0;
+    const toRemove = [];
+    
+    for (const [code, data] of claimStorage.entries()) {
+      // Remove claims that don't have applicationId (incomplete deployment)
+      if (!data.applicationId) {
+        toRemove.push(code);
+        removed++;
+      }
+    }
+    
+    toRemove.forEach(code => claimStorage.delete(code));
+    
+    res.json({
+      message: `Removed ${removed} incomplete claims`,
+      removedCount: removed,
+      remainingClaims: claimStorage.size
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

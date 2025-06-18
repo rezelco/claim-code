@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction } from './services/walletService';
-import { createClaim, submitTransaction, claimFunds } from './services/apiService';
+import { createClaim, submitTransaction, claimFunds, submitClaim, fundContract, submitFundingTransaction } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
 import { NetworkType } from './types/network';
 import NetworkSelector from './components/NetworkSelector';
@@ -17,6 +17,7 @@ interface ClaimResult {
   recipient: string;
   amount: number;
   message?: string;
+  fundingTransactionId?: string;
 }
 
 interface ClaimFundsResult {
@@ -161,8 +162,8 @@ function App() {
       setError('Please enter a valid amount');
       return false;
     }
-    if (parseFloat(amount) < 0.001) {
-      setError('Minimum amount is 0.001 ALGO');
+    if (parseFloat(amount) < 0.2) {
+      setError('Minimum amount is 0.2 ALGO (to cover network fees)');
       return false;
     }
     if (!recipient.trim()) {
@@ -253,7 +254,52 @@ function App() {
         }
       });
 
-      // Step 4: Show success result with all details
+      // Step 4: Fund the contract with the claim amount
+      setStep('submitting');
+      console.log(`Funding contract ${submitResponse.applicationId} at ${submitResponse.contractAddress} with ${amount} ALGO...`);
+      
+      // Get current account again to ensure we have the right address
+      const fundingAccount = await getConnectedAccount();
+      if (!fundingAccount) {
+        throw new Error('Unable to get connected account for funding');
+      }
+      
+      let fundingTransactionId: string | undefined;
+      try {
+        // Create funding transaction with minimum balance + claim amount + fees
+        // Contract needs: 0.1 ALGO minimum balance + claim amount + 0.001 for fees
+        const fundingAmount = 0.1 + parseFloat(amount) + 0.001;
+        console.log(`Creating funding transaction for ${fundingAmount} ALGO (0.1 min balance + ${amount} claim + 0.001 fees)`);
+        
+        const fundingTxn = await fundContract({
+          applicationId: submitResponse.applicationId,
+          amount: fundingAmount,
+          senderAddress: fundingAccount
+        });
+        
+        console.log(`Signing funding transaction...`);
+        // Sign the funding transaction
+        const signedFundingTxn = await signTransaction(fundingTxn.transactionToSign);
+        
+        console.log(`Submitting funding transaction...`);
+        // Submit the funding transaction
+        const fundingResponse = await submitFundingTransaction({
+          signedTransaction: Buffer.from(signedFundingTxn).toString('base64'),
+          claimCode: claimResponse.claimCode
+        });
+        
+        fundingTransactionId = fundingResponse.transactionId;
+        console.log(`✅ Contract funded successfully:`);
+        console.log(`   - Funding TX: ${fundingResponse.transactionId}`);
+        console.log(`   - Amount: ${fundingAmount} ALGO`);
+        console.log(`   - Contract: ${submitResponse.contractAddress}`);
+      } catch (fundingError) {
+        console.error('❌ Funding failed:', fundingError);
+        // Still show success but warn about funding
+        setError(`Contract created but funding failed: ${fundingError instanceof Error ? fundingError.message : 'Unknown error'}. The recipient won't be able to claim until the contract is funded.`);
+      }
+
+      // Step 3: Show success result with all details
       setResult({
         claimCode: claimResponse.claimCode,
         transactionId: submitResponse.transactionId,
@@ -263,7 +309,8 @@ function App() {
         notificationMethod: submitResponse.notificationMethod || 'pending',
         recipient: recipient.trim(),
         amount: parseFloat(amount),
-        message: message.trim()
+        message: message.trim(),
+        fundingTransactionId: fundingTransactionId
       });
 
       setStep('complete');
@@ -307,13 +354,48 @@ function App() {
         throw new Error(`Invalid Algorand address format: ${currentAccount}`);
       }
 
-      // Call the claim funds API
+      // Step 1: Get the claim transaction to sign
       const claimResponse = await claimFunds({
         claimCode: claimCode.trim().toUpperCase(),
         walletAddress: currentAccount
       });
 
-      setClaimResult(claimResponse);
+      // Check if we need to sign a transaction
+      if (claimResponse.requiresSigning && claimResponse.transactionToSign) {
+        setClaimStep('signing');
+        
+        // Debug: Check what we received
+        console.log('🔍 Claim response:', claimResponse);
+        console.log('🔍 Transaction to sign type:', typeof claimResponse.transactionToSign);
+        console.log('🔍 Transaction to sign value:', claimResponse.transactionToSign);
+        
+        // Validate transaction data before signing
+        if (!claimResponse.transactionToSign || typeof claimResponse.transactionToSign !== 'string') {
+          throw new Error('Invalid transaction data received from server');
+        }
+        
+        // Sign the transaction using the wallet service
+        const signedTxn = await signTransaction(claimResponse.transactionToSign);
+        
+        setClaimStep('submitting');
+        
+        // Step 2: Submit the signed transaction
+        const submitResponse = await submitClaim({
+          signedTransaction: Buffer.from(signedTxn).toString('base64'),
+          claimCode: claimResponse.claimCode!
+        });
+
+        setClaimResult({
+          success: true,
+          transactionId: submitResponse.transactionId,
+          amount: submitResponse.amount,
+          message: submitResponse.message
+        });
+      } else {
+        // Direct success (shouldn't happen with new flow, but handle for safety)
+        setClaimResult(claimResponse);
+      }
+      
       setClaimStep('complete');
       
       // Reset form
@@ -609,20 +691,34 @@ function App() {
                         type="number"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
+                        placeholder="0.20"
                         disabled={isLoading}
                         className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
-                        step="0.001"
-                        min="0.001"
+                        step="0.01"
+                        min="0.2"
                         max={isMainNet() ? "10" : undefined}
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
                         ALGO
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Minimum: 0.001 ALGO{isMainNet() ? ' • Maximum: 10 ALGO' : ''}
-                    </p>
+                    <div className="mt-2 text-sm text-gray-600">
+                      <div className="flex items-center space-x-1">
+                        <Info className="w-4 h-4 text-blue-500" />
+                        <span>
+                          Minimum 0.2 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.101).toFixed(3) : '0.301'} ALGO 
+                          (includes ~0.101 ALGO for network fees)
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Recipient receives the full amount you enter
+                      </p>
+                    </div>
+                    {isMainNet() && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Maximum: 10 ALGO for safety on MainNet
+                      </p>
+                    )}
                   </div>
 
                   {/* Recipient Input */}
