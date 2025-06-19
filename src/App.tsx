@@ -486,15 +486,23 @@ function App() {
 
         // Handle different claim statuses for existing applications
         if (statusCheck.status === 'already_claimed') {
+          console.log('🚫 Status check: already claimed - throwing error');
           throw new Error('These funds have already been claimed. Each claim code can only be used once.');
         }
         
         if (statusCheck.status === 'invalid_code') {
+          console.log('🚫 Status check: invalid code - throwing error');
           throw new Error('Invalid claim code. Please check the code and try again.');
         }
         
         if (statusCheck.status === 'unfunded') {
+          console.log('🚫 Status check: unfunded - throwing error');
           throw new Error('This contract has not been funded yet. Please ask the sender to fund the contract before claiming.');
+        }
+        
+        if (statusCheck.status === 'not_found') {
+          console.log('🚫 Status check: not found - throwing error');
+          throw new Error('Application not found. Please verify the application ID in your claim code is correct.');
         }
         
         if (statusCheck.status === 'available') {
@@ -502,12 +510,17 @@ function App() {
         }
         
       } catch (statusError) {
+        console.log('🔍 Caught status error:', statusError);
+        console.log('🔍 Error message:', statusError instanceof Error ? statusError.message : 'Unknown error');
+        
         // If it's a known validation error, re-throw it to stop the claim process
         if (statusError instanceof Error && (
           statusError.message.includes('already been claimed') ||
           statusError.message.includes('invalid claim code') ||
-          statusError.message.includes('not been funded yet')
+          statusError.message.includes('not been funded yet') ||
+          statusError.message.includes('not found on')
         )) {
+          console.log('🚫 Re-throwing validation error to stop claim process');
           throw statusError; // Re-throw validation errors to stop claim process
         }
         
