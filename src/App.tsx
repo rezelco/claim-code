@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction, setWalletTimeoutCallbacks } from './services/walletService';
 import { createClaim, submitTransaction, claimWithCode, submitClaim, refundFunds, fundContract, submitFundingTransaction, getSeedWalletAddress, checkClaimStatus } from './services/apiService';
@@ -34,6 +34,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabType>('send');
   const [walletConnected, setWalletConnected] = useState(false);
   const [connectedAccount, setConnectedAccount] = useState<string>('');
+  const walletConnectedRef = useRef(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [currentNetwork, setCurrentNetwork] = useState<NetworkType>(getCurrentNetwork());
   
   // Send Money State
@@ -94,14 +96,37 @@ function App() {
   const setupNetworkListener = () => {
     const handleNetworkChange = (event: CustomEvent) => {
       const { network } = event.detail;
-      const wasConnected = walletConnected;
+      const wasConnected = walletConnectedRef.current;
+      
+      console.log(`🔄 Network change detected: ${network}`);
+      console.log(`🔄 Wallet was connected (ref): ${wasConnected}`);
+      console.log(`🔄 Current walletConnected state: ${walletConnected}`);
       
       setCurrentNetwork(network);
       
-      // Check if wallet needs reconnection after network change
+      // Disconnect wallet when network changes for security and clarity
       if (wasConnected) {
-        setWalletConnected(false);
-        setShowReconnectPrompt(true);
+        console.log(`🔄 Network changed to ${network}, disconnecting wallet for safety`);
+        // Use async function to ensure proper sequencing
+        (async () => {
+          console.log(`🔄 Starting wallet disconnect process...`);
+          await handleDisconnectWallet();
+          console.log(`🔄 handleDisconnectWallet completed`);
+          
+          // Force immediate UI state update
+          setWalletConnected(false);
+          walletConnectedRef.current = false;
+          setConnectedAccount('');
+          setShowReconnectPrompt(true);
+          setForceUpdate(prev => prev + 1); // Force re-render
+          console.log(`🔄 Forced state updates applied`);
+          
+          // Force a connection check to update UI state
+          setTimeout(() => {
+            console.log(`🔄 Running checkWalletConnection...`);
+            checkWalletConnection();
+          }, 100);
+        })();
       }
       
       // Clear any existing results when switching networks
@@ -126,6 +151,7 @@ function App() {
   const checkWalletConnection = async () => {
     const connected = await isWalletConnected();
     setWalletConnected(connected);
+    walletConnectedRef.current = connected;
     if (connected) {
       const account = await getConnectedAccount();
       setConnectedAccount(account);
@@ -144,6 +170,7 @@ function App() {
       console.log('Wallet connected successfully:', account);
       
       setWalletConnected(true);
+      walletConnectedRef.current = true;
       setConnectedAccount(account);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet';
@@ -179,6 +206,7 @@ function App() {
       console.log('Wallet disconnected successfully');
       
       setWalletConnected(false);
+      walletConnectedRef.current = false;
       setConnectedAccount('');
       setResult(null);
       setStep('form');
@@ -830,7 +858,10 @@ function App() {
             {/* Network Selector */}
             <NetworkSelector onNetworkChange={handleNetworkChange} />
             
-            {walletConnected ? (
+            {(() => {
+              console.log(`🔄 Rendering header: walletConnected=${walletConnected}, connectedAccount=${connectedAccount}`);
+              return walletConnected;
+            })() ? (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">Pera Wallet</p>
