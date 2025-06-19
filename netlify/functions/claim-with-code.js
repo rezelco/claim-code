@@ -1,5 +1,12 @@
 import algosdk from 'algosdk';
+import crypto from 'crypto';
 import { createAlgodClient, validateAlgorandAddress, NETWORK_CONFIGS } from '../../utils/algorandClient.js';
+
+// Hash claim code for smart contract (must match create-claim.js)
+function hashClaimCode(code) {
+  // Ensure we're working with consistent UTF-8 encoding
+  return crypto.createHash('sha256').update(code, 'utf8').digest();
+}
 
 export const handler = async (event, context) => {
   // Handle CORS
@@ -76,6 +83,17 @@ export const handler = async (event, context) => {
     // Get suggested parameters
     const suggestedParams = await algodClient.getTransactionParams().do();
     
+    const normalizedClaimCode = claimCode.trim().toUpperCase();
+    const claimHash = hashClaimCode(normalizedClaimCode);
+    
+    console.log('🔑 Claim attempt details:');
+    console.log(`- Raw claim code: ${claimCode}`);
+    console.log(`- Normalized claim code: ${normalizedClaimCode}`);
+    console.log(`- Claim code length: ${normalizedClaimCode.length}`);
+    console.log(`- Claim hash length: ${claimHash.length}`);
+    console.log(`- Claim hash (hex): ${claimHash.toString('hex')}`);
+    console.log(`- Application ID: ${applicationId}`);
+    
     // Create application call transaction to claim funds
     const claimTxn = algosdk.makeApplicationCallTxnFromObject({
       sender: validatedWalletAddress,
@@ -84,7 +102,7 @@ export const handler = async (event, context) => {
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       appArgs: [
         new TextEncoder().encode('claim'),
-        new TextEncoder().encode(claimCode.trim())
+        claimHash
       ]
     });
     

@@ -10,7 +10,8 @@ function generateClaimCode() {
 
 // Hash claim code for smart contract
 function hashClaimCode(code) {
-  return crypto.createHash('sha256').update(code).digest();
+  // Ensure we're working with consistent UTF-8 encoding
+  return crypto.createHash('sha256').update(code, 'utf8').digest();
 }
 
 // Create TEAL contract for hash-based claiming with refund after 5 minutes (for testing)
@@ -84,9 +85,8 @@ int 0
 return
 
 handle_claim:
-// Verify the claim code by hashing the provided code
+// Verify the claim code hash matches stored hash
 txna ApplicationArgs 1
-sha256
 byte "hash"
 app_global_get
 ==
@@ -358,6 +358,12 @@ export const handler = async (event, context) => {
     // Generate claim code and hash it
     const claimCode = generateClaimCode();
     const hashedClaimCode = hashClaimCode(claimCode);
+    
+    console.log('🔑 Claim code details:');
+    console.log(`- Claim code: ${claimCode}`);
+    console.log(`- Claim code length: ${claimCode.length}`);
+    console.log(`- Hash length: ${hashedClaimCode.length}`);
+    console.log(`- Hash (hex): ${hashedClaimCode.toString('hex')}`);
     
     // Create TEAL program
     console.log('📝 Creating TEAL program...');
