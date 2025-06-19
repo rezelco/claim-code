@@ -2,7 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 // Simple file-based storage for serverless environment
+// Note: In serverless environments, /tmp storage is ephemeral and may not persist between function calls
 const STORAGE_DIR = '/tmp/randcash-claims';
+
+// In-memory fallback for development
+const memoryStorage = new Map();
 
 // Ensure storage directory exists
 function ensureStorageDir() {
@@ -13,31 +17,53 @@ function ensureStorageDir() {
 
 // Store claim information
 export function storeClaim(claimCode, claimData) {
-  ensureStorageDir();
-  const filePath = path.join(STORAGE_DIR, `${claimCode}.json`);
   const data = {
     ...claimData,
     createdAt: claimData.createdAt || new Date(),
     claimed: claimData.claimed || false
   };
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  
+  // Store in memory first
+  memoryStorage.set(claimCode, data);
+  
+  // Try to store in file system as backup
+  try {
+    ensureStorageDir();
+    const filePath = path.join(STORAGE_DIR, `${claimCode}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    console.log(`💾 Stored claim ${claimCode} in both memory and file system`);
+  } catch (error) {
+    console.log(`💾 Stored claim ${claimCode} in memory only (file system unavailable):`, error.message);
+  }
 }
 
 // Get claim information
 export function getClaim(claimCode) {
-  ensureStorageDir();
-  const filePath = path.join(STORAGE_DIR, `${claimCode}.json`);
+  // Check memory first
+  if (memoryStorage.has(claimCode)) {
+    console.log(`📖 Retrieved claim ${claimCode} from memory`);
+    return memoryStorage.get(claimCode);
+  }
   
+  // Fallback to file system
   try {
+    ensureStorageDir();
+    const filePath = path.join(STORAGE_DIR, `${claimCode}.json`);
+    
     if (fs.existsSync(filePath)) {
       const data = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(data);
+      const claim = JSON.parse(data);
+      // Store back in memory for faster access
+      memoryStorage.set(claimCode, claim);
+      console.log(`📖 Retrieved claim ${claimCode} from file system`);
+      return claim;
     }
-    return null;
   } catch (error) {
     console.error('Error reading claim file:', error);
-    return null;
   }
+  
+  console.log(`❌ Claim ${claimCode} not found in memory or file system`);
+  return null;
 }
 
 // Mark claim as used
@@ -47,6 +73,9 @@ export function markClaimAsUsed(claimCode) {
     claim.claimed = true;
     claim.claimedAt = new Date();
     storeClaim(claimCode, claim);
+    console.log(`✅ Marked claim ${claimCode} as used`);
+  } else {
+    console.log(`⚠️ Could not find claim ${claimCode} to mark as used`);
   }
 }
 

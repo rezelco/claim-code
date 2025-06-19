@@ -112,6 +112,27 @@ export const handler = async (event, context) => {
     
     console.log(`✅ Claim transaction created: ${txId}`);
     
+    // Debug: Check application state before claim
+    try {
+      const appInfo = await algodClient.getApplicationByID(applicationId).do();
+      console.log('📝 Application state before claim:');
+      if (appInfo.params && appInfo.params['global-state']) {
+        const globalState = appInfo.params['global-state'];
+        for (const stateItem of globalState) {
+          const key = Buffer.from(stateItem.key, 'base64').toString();
+          let value;
+          if (stateItem.value.type === 1) { // bytes
+            value = Buffer.from(stateItem.value.bytes, 'base64').toString('hex');
+          } else { // uint
+            value = stateItem.value.uint;
+          }
+          console.log(`- ${key}: ${value}`);
+        }
+      }
+    } catch (debugError) {
+      console.log('⚠️ Could not read app state for debugging:', debugError.message);
+    }
+    
     return {
       statusCode: 200,
       headers: {

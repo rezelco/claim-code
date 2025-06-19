@@ -328,3 +328,58 @@ export const getSeedWalletAddress = async (): Promise<SeedWalletInfo> => {
     throw new Error('Network error occurred while getting seed wallet address');
   }
 };
+
+interface CheckClaimStatusRequest {
+  applicationId: number;
+  claimCode: string;
+  network: string;
+}
+
+interface CheckClaimStatusResponse {
+  status: 'available' | 'already_claimed' | 'invalid_code' | 'not_found' | 'unfunded';
+  message: string;
+  amount?: number;
+  created?: number;
+  refundAvailable?: boolean;
+}
+
+export const checkClaimStatus = async (request: Omit<CheckClaimStatusRequest, 'network'>): Promise<CheckClaimStatusResponse> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch('/api/check-claim-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, network }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to check claim status';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        // If JSON parsing fails, use response text or status
+        try {
+          const errorText = await response.text();
+          errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`;
+        } catch (textError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
+    try {
+      return await response.json();
+    } catch (parseError) {
+      throw new Error('Invalid response format from claim status service');
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while checking claim status');
+  }
+};

@@ -1,6 +1,5 @@
 import algosdk from 'algosdk';
 import { createAlgodClient, NETWORK_CONFIGS } from '../../utils/algorandClient.js';
-import { getClaim, storeClaim } from '../../utils/storage.js';
 import { sendEmailNotification } from '../../utils/emailService.js';
 
 // Helper function to safely extract and convert application ID to number
@@ -159,15 +158,9 @@ export const handler = async (event, context) => {
       console.log(`✅ App created with ID: ${appId}, Address: ${contractAddress}`);
     }
 
-    // Update claim storage with actual application ID and contract address
-    if (claimDetails && claimDetails.claimCode && appId) {
-      const claimInfo = getClaim(claimDetails.claimCode);
-      if (claimInfo) {
-        claimInfo.applicationId = appId;
-        claimInfo.contractAddress = contractAddress;
-        storeClaim(claimDetails.claimCode, claimInfo);
-        console.log(`✅ Updated claim storage with actual app ID ${appId}`);
-      }
+    // No longer updating storage - keeping system stateless
+    if (appId) {
+      console.log(`✅ Application deployed with ID ${appId} - no storage update needed`);
     }
 
     // Send email notification if claim details are provided

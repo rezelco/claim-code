@@ -1,5 +1,4 @@
 import { createAlgodClient, NETWORK_CONFIGS } from '../../utils/algorandClient.js';
-import seedWalletService from '../../utils/seedWalletService.js';
 import { isValidPicaConfig } from '../../utils/emailService.js';
 
 export const handler = async (event, context) => {
@@ -35,9 +34,6 @@ export const handler = async (event, context) => {
     const algodClient = createAlgodClient(network);
     const status = await algodClient.status().do();
     
-    // Check seed wallet status
-    const seedWalletStatus = await seedWalletService.checkSeedWalletBalance(network);
-    
     return {
       statusCode: 200,
       headers: {
@@ -53,14 +49,7 @@ export const handler = async (event, context) => {
           lastRound: status['last-round']
         },
         services: {
-          email: isValidPicaConfig ? 'connected' : 'simulated',
-          seedWallet: seedWalletStatus.configured ? {
-            status: 'configured',
-            address: seedWalletStatus.address,
-            balance: `${seedWalletStatus.balance} ALGO`
-          } : {
-            status: 'not_configured'
-          }
+          email: isValidPicaConfig ? 'connected' : 'simulated'
         }
       })
     };

@@ -1,7 +1,6 @@
 import algosdk from 'algosdk';
 import crypto from 'crypto';
 import { createAlgodClient, validateAlgorandAddress, NETWORK_CONFIGS } from '../../utils/algorandClient.js';
-import { storeClaim } from '../../utils/storage.js';
 
 // Generate secure random claim code
 function generateClaimCode() {
@@ -384,6 +383,9 @@ export const handler = async (event, context) => {
       network
     );
     console.log('✅ Created single transaction');
+
+    // No longer storing claim information - keeping system stateless
+    console.log(`✅ Created claim transaction - no server storage needed`);
 
     console.log(`🎉 Single transaction created successfully on ${NETWORK_CONFIGS[network].name}:`);
     console.log(`- Claim code: ${claimCode}`);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction, setWalletTimeoutCallbacks } from './services/walletService';
-import { createClaim, submitTransaction, claimWithCode, refundFunds, fundContract, submitFundingTransaction, getSeedWalletAddress } from './services/apiService';
+import { createClaim, submitTransaction, claimWithCode, submitClaim, refundFunds, fundContract, submitFundingTransaction, getSeedWalletAddress, checkClaimStatus } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
 import { NetworkType } from './types/network';
 import NetworkSelector from './components/NetworkSelector';
@@ -253,14 +253,27 @@ function App() {
       setClaimError('Please enter your claim code');
       return false;
     }
-    if (!applicationId.trim()) {
-      setClaimError('Please enter the application ID');
+    
+    // Parse the combined claim code
+    const parts = claimCode.trim().split('-');
+    if (parts.length !== 2) {
+      setClaimError('Invalid claim code format. Expected format: APPID-CLAIMCODE');
       return false;
     }
-    if (isNaN(parseInt(applicationId)) || parseInt(applicationId) <= 0) {
-      setClaimError('Application ID must be a valid positive number');
+    
+    const [appIdPart, claimCodePart] = parts;
+    const appId = parseInt(appIdPart);
+    
+    if (isNaN(appId) || appId <= 0) {
+      setClaimError('Invalid application ID in claim code');
       return false;
     }
+    
+    if (!claimCodePart || claimCodePart.length < 8) {
+      setClaimError('Invalid claim code portion');
+      return false;
+    }
+    
     if (!walletConnected) {
       setClaimError('Please connect your wallet first');
       return false;
@@ -439,14 +452,79 @@ function App() {
         throw new Error(`Invalid Algorand address format: ${currentAccount}`);
       }
 
-      // Step 1: Create claim transaction to sign
+      // Parse the combined claim code
+      const parts = claimCode.trim().split('-');
+      console.log('🔍 Parsing claim code:', claimCode.trim());
+      console.log('🔍 Split parts:', parts);
+      
+      if (parts.length !== 2) {
+        throw new Error('Invalid claim code format. Please use the format: ApplicationID-ClaimCode');
+      }
+      
+      const [appIdStr, actualClaimCode] = parts;
+      const appId = parseInt(appIdStr);
+      
+      console.log('🔍 Parsed Application ID:', appId);
+      console.log('🔍 Parsed Claim Code:', actualClaimCode);
+      
+      if (isNaN(appId) || appId <= 0) {
+        throw new Error('Invalid application ID in claim code');
+      }
+
+      // Step 1: Try to check claim status (optional validation)
+      let statusCheck = null;
+      try {
+        console.log('🔍 Checking claim status...');
+        console.log('Request data:', { applicationId: appId, claimCode: actualClaimCode });
+        
+        statusCheck = await checkClaimStatus({
+          applicationId: appId,
+          claimCode: actualClaimCode
+        });
+        
+        console.log('Status check response:', statusCheck);
+
+        // Handle different claim statuses for existing applications
+        if (statusCheck.status === 'already_claimed') {
+          throw new Error('These funds have already been claimed. Each claim code can only be used once.');
+        }
+        
+        if (statusCheck.status === 'invalid_code') {
+          throw new Error('Invalid claim code. Please check the code and try again.');
+        }
+        
+        if (statusCheck.status === 'unfunded') {
+          throw new Error('This contract has not been funded yet. Please ask the sender to fund the contract before claiming.');
+        }
+        
+        if (statusCheck.status === 'available') {
+          console.log(`✅ Claim validated: ${statusCheck.amount} ALGO available`);
+        }
+        
+      } catch (statusError) {
+        // If it's a known validation error, re-throw it to stop the claim process
+        if (statusError instanceof Error && (
+          statusError.message.includes('already been claimed') ||
+          statusError.message.includes('invalid claim code') ||
+          statusError.message.includes('not been funded yet')
+        )) {
+          throw statusError; // Re-throw validation errors to stop claim process
+        }
+        
+        console.log('⚠️ Status check failed (this is normal for new contracts):', statusError.message);
+        console.log('⚠️ Proceeding with claim attempt - will get better error if claim fails');
+        // Continue with the claim attempt for unknown errors
+      }
+
+      // Step 2: Create claim transaction using claim-with-code
+      console.log('🔍 Creating claim transaction...');
       const claimResponse = await claimWithCode({
-        applicationId: parseInt(applicationId),
-        claimCode: claimCode.trim(),
+        applicationId: appId,
+        claimCode: actualClaimCode,
         walletAddress: currentAccount
       });
 
-      // Step 2: Sign the claim transaction
+      // Step 3: Sign the claim transaction
       console.log('🔍 Signing claim transaction...');
       const txnBuffer = Buffer.from(claimResponse.transactionToSign, 'base64');
       const transaction = algosdk.decodeUnsignedTransaction(txnBuffer);
@@ -455,7 +533,7 @@ function App() {
       
       setClaimStep('submitting');
 
-      // Step 3: Submit the signed transaction directly to Algorand
+      // Step 4: Submit the signed transaction directly to Algorand
       const algodClient = new algosdk.Algodv2('', getCurrentNetwork() === 'testnet' ? 'https://testnet-api.4160.nodely.dev' : 'https://mainnet-api.4160.nodely.dev', 443);
       const txResponse = await algodClient.sendRawTransaction(signedTxn).do();
       const txId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
@@ -464,21 +542,47 @@ function App() {
         throw new Error('No transaction ID returned from submission');
       }
 
-      // Step 4: Wait for confirmation
+      // Step 5: Wait for confirmation
       console.log('⏳ Waiting for claim transaction confirmation...');
       const confirmedTxn = await algosdk.waitForConfirmation(algodClient, txId, 15);
       
-      // Check the logs to see how much was claimed
-      let claimedAmount = 0;
-      if (confirmedTxn.logs && confirmedTxn.logs.length > 0) {
-        // Contract should log the amount being claimed
-        console.log('📝 Transaction logs:', confirmedTxn.logs);
+      // Use amount from status check if available, otherwise fall back to transaction parsing
+      let claimedAmount = (statusCheck && statusCheck.amount) || 0;
+      
+      // If no amount from status check, try to parse from transaction
+      if (claimedAmount === 0) {
+        console.log('💡 No amount from status check, parsing transaction...');
+        const innerTxns = confirmedTxn['inner-txns'] || confirmedTxn.innerTxns || confirmedTxn['inner_txns'];
+        
+        if (innerTxns && innerTxns.length > 0) {
+          for (let i = 0; i < innerTxns.length; i++) {
+            const innerTxn = innerTxns[i];
+            const paymentTxn = innerTxn['payment-transaction'] || 
+                              innerTxn.paymentTransaction || 
+                              innerTxn['payment_transaction'] ||
+                              innerTxn.txn ||
+                              innerTxn;
+                              
+            if (paymentTxn && paymentTxn.amt !== undefined) {
+              claimedAmount = paymentTxn.amt / 1000000;
+              console.log(`💰 Found amount from inner txn ${i}: ${claimedAmount} ALGO`);
+              break;
+            }
+          }
+        }
       }
-
+      
+      console.log(`💰 Final claim amount: ${claimedAmount} ALGO`);
+      
+      // Keep transaction logging for debugging purposes
+      console.log('📝 Transaction confirmed with ID:', txId);
+      console.log('📝 Confirmed transaction details:', JSON.stringify(confirmedTxn, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value, 2));
+      
       setClaimResult({
         success: true,
         transactionId: txId,
-        amount: claimedAmount, // We'll need to get this from contract state
+        amount: claimedAmount,
         message: 'Funds claimed successfully!'
       });
       
@@ -486,9 +590,28 @@ function App() {
       
       // Reset form
       setClaimCode('');
-      setApplicationId('');
     } catch (err) {
-      setClaimError(err instanceof Error ? err.message : 'Failed to claim funds');
+      console.error('❌ Claim failed:', err);
+      
+      let errorMessage = 'Failed to claim funds';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        // Provide better error messages for common smart contract errors
+        if (errorMessage.includes('assert failed pc=128') || errorMessage.includes('assert failed pc=129')) {
+          errorMessage = 'These funds have already been claimed or the contract has expired. Each claim code can only be used once.';
+        } else if (errorMessage.includes('assert failed pc=92') || errorMessage.includes('assert failed pc=93')) {
+          errorMessage = 'Invalid claim code. Please check the code and try again.';
+        } else if (errorMessage.includes('logic eval error') && errorMessage.includes('assert failed')) {
+          errorMessage = 'Claim validation failed. This could mean the funds were already claimed, the claim code is invalid, or the contract has expired.';
+        } else if (errorMessage.includes('application does not exist')) {
+          errorMessage = 'Contract not found. Please verify the application ID in your claim code is correct.';
+        } else if (errorMessage.includes('Contract has not been funded yet')) {
+          errorMessage = 'This contract has not been funded yet. Please ask the sender to fund the contract first.';
+        }
+      }
+      
+      setClaimError(errorMessage);
       setClaimStep('form');
     } finally {
       setClaimLoading(false);
@@ -825,51 +948,29 @@ function App() {
                 </div>
                 
                 <div className="p-6 space-y-4">
-                  {/* Application ID - Critical for claiming */}
+                  {/* Combined Claim Code */}
                   {result.applicationId && (
-                    <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-5 border border-purple-200">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-lg font-semibold text-purple-900">Application ID</h3>
+                        <h3 className="text-lg font-semibold text-blue-900">Claim Code</h3>
                         <button
-                          onClick={() => copyToClipboard(result.applicationId!.toString(), 'applicationId')}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
+                          onClick={() => copyToClipboard(`${result.applicationId}-${result.claimCode}`, 'claimCode')}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
                         >
                           <Copy className="w-4 h-4" />
-                          <span>{copiedField === 'applicationId' ? 'Copied!' : 'Copy'}</span>
+                          <span>{copiedField === 'claimCode' ? 'Copied!' : 'Copy'}</span>
                         </button>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border-2 border-purple-300">
-                        <p className="font-mono text-2xl font-bold text-gray-900 text-center tracking-wider">
-                          {result.applicationId}
+                      <div className="bg-white rounded-lg p-4 border-2 border-blue-300">
+                        <p className="font-mono text-lg font-bold text-gray-900 text-center tracking-wider break-all">
+                          {result.applicationId}-{result.claimCode}
                         </p>
                       </div>
-                      <p className="text-purple-700 text-sm mt-3 text-center">
-                        The recipient will need this Application ID along with the claim code
+                      <p className="text-blue-700 text-sm mt-3 text-center">
+                        Share this code with the recipient to claim their funds
                       </p>
                     </div>
                   )}
-
-                  {/* Claim Code - Most Important */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-blue-900">Claim Code</h3>
-                      <button
-                        onClick={() => copyToClipboard(result.claimCode, 'claimCode')}
-                        className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-                      >
-                        <Copy className="w-4 h-4" />
-                        <span>{copiedField === 'claimCode' ? 'Copied!' : 'Copy'}</span>
-                      </button>
-                    </div>
-                    <div className="bg-white rounded-lg p-4 border-2 border-blue-300">
-                      <p className="font-mono text-2xl font-bold text-gray-900 text-center tracking-wider">
-                        {result.claimCode}
-                      </p>
-                    </div>
-                    <p className="text-blue-700 text-sm mt-3 text-center">
-                      The recipient will need this code to claim their funds
-                    </p>
-                  </div>
 
                   {/* Transaction Details */}
                   <div className="bg-gray-50 rounded-xl p-4 space-y-3">
@@ -1185,25 +1286,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Application ID Input */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Application ID
-                    </label>
-                    <input
-                      type="number"
-                      value={applicationId}
-                      onChange={(e) => setApplicationId(e.target.value)}
-                      placeholder="Enter the contract application ID"
-                      disabled={claimLoading}
-                      className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      The application ID of the smart contract (found in the transaction details when the funds were sent).
-                    </p>
-                  </div>
-
-                  {/* Claim Code Input */}
+                  {/* Combined Claim Code Input */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Claim Code
@@ -1212,12 +1295,12 @@ function App() {
                       type="text"
                       value={claimCode}
                       onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
-                      placeholder="Enter your claim code"
+                      placeholder="e.g., 741503729-A1B2C3D4E5F6G7H8"
                       disabled={claimLoading}
                       className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter the claim code you received to claim your funds.
+                      Enter the claim code you received (includes both app ID and claim code).
                     </p>
                   </div>
 

@@ -8,7 +8,6 @@ A decentralized application for sending cryptocurrency via claim codes on the Al
 - Smart contract-based claiming system with automatic refunds
 - Support for Algorand TestNet and MainNet
 - Email notifications via Pica/Resend integration
-- Seed wallet funding for new users
 
 ## Technology Stack
 
@@ -40,7 +39,6 @@ A decentralized application for sending cryptocurrency via claim codes on the Al
    - `PICA_SECRET_KEY`: Your Pica API secret key
    - `PICA_RESEND_CONNECTION_KEY`: Your Pica Resend connection key
    - `PICA_FROM_EMAIL`: Email address for sending notifications
-   - `SEED_MNEMONIC`: 25-word mnemonic for seed wallet (optional)
 
 4. **Development with Netlify Functions**
    ```bash
@@ -78,7 +76,6 @@ A decentralized application for sending cryptocurrency via claim codes on the Al
    - `PICA_SECRET_KEY`
    - `PICA_RESEND_CONNECTION_KEY`
    - `PICA_FROM_EMAIL`
-   - `SEED_MNEMONIC`
    - `NODE_VERSION=18`
 
 ### Manual Netlify Setup
@@ -100,7 +97,6 @@ All endpoints are available as Netlify Functions under `/api/`:
 - `POST /api/refund-funds` - Create refund transaction
 - `POST /api/fund-contract` - Create funding transaction
 - `GET /api/health` - Health check
-- `GET /api/seed-wallet-address` - Get seed wallet info
 
 ## Project Structure
 
