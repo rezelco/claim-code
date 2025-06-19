@@ -67,12 +67,14 @@ class SeedWalletService {
 
       // Test if we can derive an account from the mnemonic
       const account = algosdk.mnemonicToSecretKey(this.seedMnemonic);
-      if (!algosdk.isValidAddress(account.addr)) {
+      // In algosdk v3, account.addr is an Address object, need to convert to string
+      const addressString = account.addr.toString();
+      if (!algosdk.isValidAddress(addressString)) {
         console.error('❌ Invalid seed wallet mnemonic - cannot derive valid address');
         return false;
       }
 
-      console.log(`📝 Seed wallet address: ${account.addr}`);
+      console.log(`📝 Seed wallet address: ${addressString}`);
       return true;
     } catch (error) {
       console.error('❌ Error validating seed mnemonic:', error.message);
@@ -96,12 +98,12 @@ class SeedWalletService {
       const algodClient = createAlgodClient(network);
       const seedAccount = this.getSeedAccount();
       
-      const accountInfo = await algodClient.accountInformation(seedAccount.addr).do();
+      const accountInfo = await algodClient.accountInformation(seedAccount.addr.toString()).do();
       const balance = typeof accountInfo.amount === 'bigint' ? accountInfo.amount : BigInt(accountInfo.amount);
       
       return {
         configured: true,
-        address: seedAccount.addr,
+        address: seedAccount.addr.toString(),
         balance: Number(balance) / 1000000, // Convert to ALGO
         balanceMicroAlgos: Number(balance)
       };
@@ -211,7 +213,7 @@ class SeedWalletService {
       // Create payment transaction
       const amountMicroAlgos = Math.floor(amount * 1000000);
       const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        sender: seedAccount.addr,
+        sender: seedAccount.addr.toString(),
         receiver: address,
         amount: amountMicroAlgos,
         suggestedParams: suggestedParams,

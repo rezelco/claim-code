@@ -5,6 +5,15 @@ class WalletService {
   private peraWallet: any = null;
   private connected: boolean = false;
   private account: string = '';
+  
+  // Timeout configuration
+  private readonly INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+  private readonly WARNING_BEFORE_DISCONNECT_MS = 60 * 1000; // 1 minute warning
+  private inactivityTimer: NodeJS.Timeout | null = null;
+  private warningTimer: NodeJS.Timeout | null = null;
+  private activityListeners: Array<{ type: string; handler: () => void }> = [];
+  private onTimeoutWarning?: (timeRemaining: number) => void;
+  private onAutoDisconnect?: () => void;
 
   constructor() {
     this.initializeFromStorage();
@@ -39,6 +48,9 @@ class WalletService {
         this.connected = true;
         localStorage.setItem('wallet_connected', 'true');
         localStorage.setItem('wallet_account', this.account);
+        
+        // Start activity tracking for auto-disconnect
+        this.setupActivityTracking();
       }
     } catch (error) {
       // No existing session to reconnect, which is fine
@@ -61,6 +73,84 @@ class WalletService {
     window.addEventListener('networkChanged', () => {
       this.handleNetworkChange();
     });
+  }
+
+  private setupActivityTracking() {
+    if (!this.connected) return;
+
+    // Define activity events to track
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      this.resetInactivityTimer();
+    };
+
+    // Add event listeners
+    activityEvents.forEach(event => {
+      const listener = { type: event, handler: handleActivity };
+      this.activityListeners.push(listener);
+      document.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    // Start the inactivity timer
+    this.resetInactivityTimer();
+  }
+
+  private cleanupActivityTracking() {
+    // Remove all activity event listeners
+    this.activityListeners.forEach(({ type, handler }) => {
+      document.removeEventListener(type, handler);
+    });
+    this.activityListeners = [];
+
+    // Clear any existing timers
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    if (this.warningTimer) {
+      clearTimeout(this.warningTimer);
+      this.warningTimer = null;
+    }
+  }
+
+  private resetInactivityTimer() {
+    // Clear existing timers
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+    }
+    if (this.warningTimer) {
+      clearTimeout(this.warningTimer);
+    }
+
+    // Set warning timer (1 minute before disconnect)
+    this.warningTimer = setTimeout(() => {
+      if (this.onTimeoutWarning) {
+        this.onTimeoutWarning(this.WARNING_BEFORE_DISCONNECT_MS / 1000); // Convert to seconds
+      }
+    }, this.INACTIVITY_TIMEOUT_MS - this.WARNING_BEFORE_DISCONNECT_MS);
+
+    // Set disconnect timer
+    this.inactivityTimer = setTimeout(() => {
+      this.handleInactivityTimeout();
+    }, this.INACTIVITY_TIMEOUT_MS);
+  }
+
+  private async handleInactivityTimeout() {
+    console.log('Wallet auto-disconnecting due to inactivity');
+    
+    // Notify about auto-disconnect
+    if (this.onAutoDisconnect) {
+      this.onAutoDisconnect();
+    }
+
+    // Disconnect the wallet
+    await this.disconnectWallet();
+  }
+
+  setTimeoutCallbacks(onWarning?: (timeRemaining: number) => void, onDisconnect?: () => void) {
+    this.onTimeoutWarning = onWarning;
+    this.onAutoDisconnect = onDisconnect;
   }
 
   private async handleNetworkChange() {
@@ -117,6 +207,9 @@ class WalletService {
       localStorage.setItem('wallet_connected', 'true');
       localStorage.setItem('wallet_account', this.account);
       
+      // Start activity tracking for auto-disconnect
+      this.setupActivityTracking();
+      
       return this.account;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -145,6 +238,9 @@ class WalletService {
       
       this.connected = false;
       this.account = '';
+      
+      // Clean up activity tracking
+      this.cleanupActivityTracking();
       
       localStorage.removeItem('wallet_connected');
       localStorage.removeItem('wallet_account');
@@ -228,3 +324,5 @@ export const isWalletConnected = () => walletService.isWalletConnected();
 export const getConnectedAccount = () => walletService.getConnectedAccount();
 export const signTransaction = (transaction: algosdk.Transaction | string) => walletService.signTransaction(transaction);
 export const getWalletType = () => walletService.getWalletType();
+export const setWalletTimeoutCallbacks = (onWarning?: (timeRemaining: number) => void, onDisconnect?: () => void) => 
+  walletService.setTimeoutCallbacks(onWarning, onDisconnect);

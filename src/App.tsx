@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download } from 'lucide-react';
-import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction } from './services/walletService';
-import { createClaim, submitTransaction, claimFunds, submitClaim, fundContract, submitFundingTransaction } from './services/apiService';
+import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock } from 'lucide-react';
+import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction, setWalletTimeoutCallbacks } from './services/walletService';
+import { createClaim, submitTransaction, claimFunds, submitClaim, fundContract, submitFundingTransaction, getSeedWalletAddress } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
 import { NetworkType } from './types/network';
 import NetworkSelector from './components/NetworkSelector';
@@ -18,6 +18,7 @@ interface ClaimResult {
   amount: number;
   message?: string;
   fundingTransactionId?: string;
+  seedTransactionId?: string;
 }
 
 interface ClaimFundsResult {
@@ -52,10 +53,32 @@ function App() {
   const [claimResult, setClaimResult] = useState<ClaimFundsResult | null>(null);
   const [claimError, setClaimError] = useState<string>('');
   const [claimStep, setClaimStep] = useState<'form' | 'signing' | 'submitting' | 'complete'>('form');
+  
+  // Timeout warning state
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(60);
 
   useEffect(() => {
     checkWalletConnection();
     setupNetworkListener();
+    
+    // Setup wallet timeout callbacks
+    setWalletTimeoutCallbacks(
+      (remainingSeconds) => {
+        setTimeoutSeconds(remainingSeconds);
+        setShowTimeoutWarning(true);
+      },
+      () => {
+        setShowTimeoutWarning(false);
+        setWalletConnected(false);
+        setConnectedAccount('');
+        // Clear form data on auto-disconnect for security
+        setAmount('');
+        setRecipient('');
+        setMessage('');
+        setClaimCode('');
+      }
+    );
   }, []);
 
   const setupNetworkListener = () => {
@@ -265,24 +288,27 @@ function App() {
       }
       
       let fundingTransactionId: string | undefined;
+      let seedTransactionId: string | undefined;
+      
       try {
-        // Create funding transaction with minimum balance + claim amount + fees + seed funding
-        // Contract needs: 0.1 ALGO minimum balance + claim amount + 0.001 for fees + 0.004 for potential seeding
-        const fundingAmount = 0.1 + parseFloat(amount) + 0.005; // Increased from 0.001 to 0.005 for seeding
-        console.log(`Creating funding transaction for ${fundingAmount} ALGO (0.1 min balance + ${amount} claim + 0.005 fees/seeding)`);
+        // Get seed wallet info
+        const seedWalletInfo = await getSeedWalletAddress();
+        const seedContribution = seedWalletInfo.configured ? (seedWalletInfo.recommendedContribution || 0.005) : 0;
+        
+        // Create contract funding transaction (without seed contribution)
+        const contractFundingAmount = 0.1 + parseFloat(amount) + 0.005; // Contract min balance + claim amount + fees
+        console.log(`Creating contract funding transaction for ${contractFundingAmount} ALGO (0.1 min balance + ${amount} claim + 0.005 fees)`);
         
         const fundingTxn = await fundContract({
           applicationId: submitResponse.applicationId,
-          amount: fundingAmount,
+          amount: contractFundingAmount,
           senderAddress: fundingAccount
         });
         
-        console.log(`Signing funding transaction...`);
-        // Sign the funding transaction
+        console.log(`Signing contract funding transaction...`);
         const signedFundingTxn = await signTransaction(fundingTxn.transactionToSign);
         
-        console.log(`Submitting funding transaction...`);
-        // Submit the funding transaction
+        console.log(`Submitting contract funding transaction...`);
         const fundingResponse = await submitFundingTransaction({
           signedTransaction: Buffer.from(signedFundingTxn).toString('base64'),
           claimCode: claimResponse.claimCode
@@ -291,8 +317,41 @@ function App() {
         fundingTransactionId = fundingResponse.transactionId;
         console.log(`✅ Contract funded successfully:`);
         console.log(`   - Funding TX: ${fundingResponse.transactionId}`);
-        console.log(`   - Amount: ${fundingAmount} ALGO`);
+        console.log(`   - Amount: ${contractFundingAmount} ALGO`);
         console.log(`   - Contract: ${submitResponse.contractAddress}`);
+        
+        // Create seed wallet contribution transaction if seed wallet is configured
+        if (seedWalletInfo.configured && seedContribution > 0) {
+          console.log(`Creating seed wallet contribution transaction for ${seedContribution} ALGO to ${seedWalletInfo.address}`);
+          
+          // Create manual payment transaction to seed wallet
+          const networkConfig = getNetworkConfig();
+          const algodClient = new algosdk.Algodv2('', networkConfig.algodServer, networkConfig.algodPort);
+          const suggestedParams = await algodClient.getTransactionParams().do();
+          
+          const seedPaymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+            sender: fundingAccount,
+            receiver: seedWalletInfo.address!,
+            amount: Math.floor(seedContribution * 1000000), // Convert to microAlgos
+            suggestedParams: suggestedParams,
+            note: new TextEncoder().encode('RandCash seed wallet contribution')
+          });
+          
+          console.log(`Signing seed contribution transaction...`);
+          const signedSeedTxn = await signTransaction(Buffer.from(algosdk.encodeUnsignedTransaction(seedPaymentTxn)).toString('base64'));
+          
+          console.log(`Submitting seed contribution transaction...`);
+          const seedResponse = await submitFundingTransaction({
+            signedTransaction: Buffer.from(signedSeedTxn).toString('base64')
+          });
+          
+          seedTransactionId = seedResponse.transactionId;
+          console.log(`✅ Seed wallet contribution successful:`);
+          console.log(`   - Seed TX: ${seedResponse.transactionId}`);
+          console.log(`   - Amount: ${seedContribution} ALGO`);
+          console.log(`   - To seed wallet: ${seedWalletInfo.address}`);
+        }
+        
       } catch (fundingError) {
         console.error('❌ Funding failed:', fundingError);
         // Still show success but warn about funding
@@ -310,7 +369,8 @@ function App() {
         recipient: recipient.trim(),
         amount: parseFloat(amount),
         message: message.trim(),
-        fundingTransactionId: fundingTransactionId
+        fundingTransactionId: fundingTransactionId,
+        seedTransactionId: seedTransactionId
       });
 
       setStep('complete');
@@ -475,6 +535,45 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      {/* Timeout Warning Modal */}
+      {showTimeoutWarning && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">Wallet Timeout Warning</h3>
+                <p className="text-gray-600 mt-1">
+                  Your wallet will automatically disconnect in {timeoutSeconds} seconds due to inactivity.
+                </p>
+                <div className="mt-4 flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowTimeoutWarning(false);
+                      // Any interaction will reset the timer
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Keep Connected
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowTimeoutWarning(false);
+                      await handleDisconnectWallet();
+                    }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  >
+                    Disconnect Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -632,6 +731,53 @@ function App() {
                     </p>
                   </div>
 
+                  {/* Transaction Details */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <h4 className="font-medium text-gray-900 text-sm">Transaction Details</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Contract Creation:</span>
+                        <a
+                          href={getExplorerUrl(result.transactionId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                        >
+                          <span className="font-mono">{result.transactionId.slice(0, 8)}...{result.transactionId.slice(-6)}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                      {result.fundingTransactionId && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Contract Funding:</span>
+                          <a
+                            href={getExplorerUrl(result.fundingTransactionId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                          >
+                            <span className="font-mono">{result.fundingTransactionId.slice(0, 8)}...{result.fundingTransactionId.slice(-6)}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                      {result.seedTransactionId && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Seed Contribution:</span>
+                          <a
+                            href={getExplorerUrl(result.seedTransactionId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                          >
+                            <span className="font-mono">{result.seedTransactionId.slice(0, 8)}...{result.seedTransactionId.slice(-6)}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
@@ -648,7 +794,7 @@ function App() {
                       className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
                     >
                       <ExternalLink className="w-5 h-5" />
-                      <span>View on Explorer</span>
+                      <span>View Contract</span>
                     </a>
                   </div>
                 </div>
@@ -706,8 +852,8 @@ function App() {
                       <div className="flex items-center space-x-1">
                         <Info className="w-4 h-4 text-blue-500" />
                         <span>
-                          Minimum 0.204 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.105).toFixed(3) : '0.309'} ALGO 
-                          (includes ~0.105 ALGO for network fees and seed funding)
+                          Minimum 0.204 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.110).toFixed(3) : '0.314'} ALGO 
+                          (includes ~0.105 ALGO for network fees + 0.005 ALGO seed funding contribution)
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">

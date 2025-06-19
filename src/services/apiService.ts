@@ -264,3 +264,33 @@ export const checkHealth = async () => {
     throw new Error('Failed to check API health');
   }
 };
+
+interface SeedWalletInfo {
+  configured: boolean;
+  address?: string;
+  balance?: number;
+  recommendedContribution?: number;
+}
+
+export const getSeedWalletAddress = async (): Promise<SeedWalletInfo> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch(`/api/seed-wallet-address?network=${network}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 503) {
+        // Seed wallet not configured
+        return { configured: false };
+      }
+      throw new Error(errorData.error || 'Failed to get seed wallet address');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while getting seed wallet address');
+  }
+};

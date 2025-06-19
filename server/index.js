@@ -1371,6 +1371,40 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// API endpoint to get seed wallet address for contributions
+app.get('/api/seed-wallet-address', async (req, res) => {
+  try {
+    const network = req.query.network || 'testnet';
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    // Check seed wallet status
+    const seedWalletStatus = await seedWalletService.checkSeedWalletBalance(network);
+    
+    if (!seedWalletStatus.configured) {
+      return res.status(503).json({ 
+        error: 'Seed wallet service not configured',
+        configured: false
+      });
+    }
+    
+    res.json({
+      configured: true,
+      address: seedWalletStatus.address,
+      balance: seedWalletStatus.balance,
+      recommendedContribution: 0.005 // ALGO
+    });
+  } catch (error) {
+    console.error('❌ Error getting seed wallet address:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to get seed wallet address'
+    });
+  }
+});
+
 // Debug endpoint to check claim status (only for development)
 app.get('/api/debug/claims', (req, res) => {
   try {
