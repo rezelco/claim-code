@@ -63,14 +63,6 @@ class SeedWalletService {
       .replace(/\s+/g, ' ')            // Replace multiple whitespace with single space
       .toLowerCase();                   // Convert to lowercase for consistency
 
-    // Temporary debugging logs
-    console.log('🔍 [DEBUG] Mnemonic validation details:');
-    console.log(`   - Original length: ${this.seedMnemonic.length} characters`);
-    console.log(`   - Normalized length: ${normalizedMnemonic.length} characters`);
-    console.log(`   - Word count: ${normalizedMnemonic.split(' ').length} words`);
-    console.log(`   - First 3 words: "${normalizedMnemonic.split(' ').slice(0, 3).join(' ')}"`);
-    console.log(`   - Last 3 words: "${normalizedMnemonic.split(' ').slice(-3).join(' ')}"`);
-
     try {
       // Validate mnemonic format - support both 24 and 25 word mnemonics
       const words = normalizedMnemonic.split(' ');
@@ -82,12 +74,17 @@ class SeedWalletService {
       // Test if we can derive an account from the normalized mnemonic
       const account = algosdk.mnemonicToSecretKey(normalizedMnemonic);
       
-      // Temporary debugging log for derived address
-      console.log(`🔍 [DEBUG] Derived address: ${account.addr}`);
-      console.log(`🔍 [DEBUG] Address validation: ${algosdk.isValidAddress(account.addr)}`);
-      
+      // Check if the derived address looks valid (58 characters, proper format)
+      if (!account.addr || account.addr.length !== 58) {
+        console.error('❌ Invalid seed wallet mnemonic - derived address has wrong length');
+        console.error(`   - Derived address: ${account.addr}`);
+        console.error(`   - Address length: ${account.addr?.length || 0} (should be 58)`);
+        return false;
+      }
+
+      // Additional validation using algosdk's built-in validator
       if (!algosdk.isValidAddress(account.addr)) {
-        console.error('❌ Invalid seed wallet mnemonic - cannot derive valid address');
+        console.error('❌ Invalid seed wallet mnemonic - algosdk validation failed');
         console.error(`   - Derived address: ${account.addr}`);
         return false;
       }
@@ -95,8 +92,9 @@ class SeedWalletService {
       // Update the instance mnemonic to use the normalized version
       this.seedMnemonic = normalizedMnemonic;
 
-      console.log(`📝 Seed wallet address: ${account.addr}`);
-      console.log(`📝 Mnemonic word count: ${words.length} words`);
+      console.log(`✅ Seed wallet configured successfully`);
+      console.log(`   - Address: ${account.addr}`);
+      console.log(`   - Mnemonic word count: ${words.length} words`);
       return true;
     } catch (error) {
       console.error('❌ Error validating seed mnemonic:', error.message);
