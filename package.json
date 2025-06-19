@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.js",
-    "dev:full": "concurrently \"npm run server\" \"npm run dev\""
+    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "netlify:dev": "netlify dev",
+    "netlify:build": "npm run build",
+    "netlify:deploy": "netlify deploy --prod --dir=dist"
   },
   "dependencies": {
     "lucide-react": "^0.344.0",
