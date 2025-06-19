@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction, setWalletTimeoutCallbacks } from './services/walletService';
-import { createClaim, submitTransaction, claimFunds, submitClaim, fundContract, submitFundingTransaction, getSeedWalletAddress } from './services/apiService';
+import { createClaim, submitTransaction, claimWithCode, refundFunds, fundContract, submitFundingTransaction, getSeedWalletAddress } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
 import { NetworkType } from './types/network';
 import NetworkSelector from './components/NetworkSelector';
@@ -28,7 +28,7 @@ interface ClaimFundsResult {
   message?: string;
 }
 
-type TabType = 'send' | 'claim';
+type TabType = 'send' | 'claim' | 'refund';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('send');
@@ -49,10 +49,18 @@ function App() {
 
   // Claim Money State
   const [claimCode, setClaimCode] = useState('');
+  const [applicationId, setApplicationId] = useState('');
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimResult, setClaimResult] = useState<ClaimFundsResult | null>(null);
   const [claimError, setClaimError] = useState<string>('');
   const [claimStep, setClaimStep] = useState<'form' | 'signing' | 'submitting' | 'complete'>('form');
+  
+  // Refund Money State
+  const [refundApplicationId, setRefundApplicationId] = useState('');
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundResult, setRefundResult] = useState<ClaimFundsResult | null>(null);
+  const [refundError, setRefundError] = useState<string>('');
+  const [refundStep, setRefundStep] = useState<'form' | 'signing' | 'submitting' | 'complete'>('form');
   
   // Timeout warning state
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
@@ -77,6 +85,8 @@ function App() {
         setRecipient('');
         setMessage('');
         setClaimCode('');
+        setApplicationId('');
+        setRefundApplicationId('');
       }
     );
   }, []);
@@ -101,6 +111,9 @@ function App() {
       setClaimResult(null);
       setClaimError('');
       setClaimStep('form');
+      setRefundResult(null);
+      setRefundError('');
+      setRefundStep('form');
     };
 
     window.addEventListener('networkChanged', handleNetworkChange as EventListener);
@@ -125,15 +138,24 @@ function App() {
       setClaimError('');
       setIsLoading(true);
       setShowReconnectPrompt(false);
+      
+      console.log('Attempting to connect wallet...');
       const account = await connectWallet();
+      console.log('Wallet connected successfully:', account);
+      
       setWalletConnected(true);
       setConnectedAccount(account);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet';
+      console.error('Wallet connection failed:', errorMessage);
       
       // Check if the error is due to user cancellation
-      if (errorMessage.includes('Connect modal is closed by user') || errorMessage.includes('User cancelled')) {
+      if (errorMessage.includes('Connect modal is closed by user') || 
+          errorMessage.includes('User cancelled') || 
+          errorMessage.includes('User canceled') ||
+          errorMessage.includes('User rejected')) {
         // Don't show error for user cancellations, just clear any existing error
+        console.log('User cancelled wallet connection');
         setError('');
         setClaimError('');
       } else {
@@ -146,12 +168,16 @@ function App() {
       }
     } finally {
       setIsLoading(false);
+      console.log('Connect wallet attempt finished, loading state reset');
     }
   };
 
   const handleDisconnectWallet = async () => {
     try {
+      console.log('Disconnecting wallet...');
       await disconnectWallet();
+      console.log('Wallet disconnected successfully');
+      
       setWalletConnected(false);
       setConnectedAccount('');
       setResult(null);
@@ -159,13 +185,25 @@ function App() {
       setClaimResult(null);
       setClaimStep('form');
       setShowReconnectPrompt(false);
+      // Ensure loading states are reset after disconnect
+      setIsLoading(false);
+      setClaimLoading(false);
+      setError('');
+      setClaimError('');
+      
+      console.log('UI state reset after disconnect');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to disconnect wallet';
+      console.error('Disconnect failed:', errorMessage);
+      
       if (activeTab === 'send') {
         setError(errorMessage);
       } else {
         setClaimError(errorMessage);
       }
+      // Reset loading states even if disconnect fails
+      setIsLoading(false);
+      setClaimLoading(false);
     }
   };
 
@@ -178,6 +216,7 @@ function App() {
     // Clear errors when switching tabs
     setError('');
     setClaimError('');
+    setRefundError('');
   };
 
   const validateForm = () => {
@@ -185,8 +224,8 @@ function App() {
       setError('Please enter a valid amount');
       return false;
     }
-    if (parseFloat(amount) < 0.204) {
-      setError('Minimum amount is 0.204 ALGO (includes seed funding for recipients with zero balance)');
+    if (parseFloat(amount) < 0.1) {
+      setError('Minimum amount is 0.1 ALGO (required for Algorand account minimum balance)');
       return false;
     }
     if (!recipient.trim()) {
@@ -214,8 +253,32 @@ function App() {
       setClaimError('Please enter your claim code');
       return false;
     }
+    if (!applicationId.trim()) {
+      setClaimError('Please enter the application ID');
+      return false;
+    }
+    if (isNaN(parseInt(applicationId)) || parseInt(applicationId) <= 0) {
+      setClaimError('Application ID must be a valid positive number');
+      return false;
+    }
     if (!walletConnected) {
       setClaimError('Please connect your wallet first');
+      return false;
+    }
+    return true;
+  };
+
+  const validateRefundForm = () => {
+    if (!refundApplicationId.trim()) {
+      setRefundError('Please enter the application ID');
+      return false;
+    }
+    if (isNaN(parseInt(refundApplicationId)) || parseInt(refundApplicationId) <= 0) {
+      setRefundError('Application ID must be a valid positive number');
+      return false;
+    }
+    if (!walletConnected) {
+      setRefundError('Please connect your wallet first');
       return false;
     }
     return true;
@@ -250,7 +313,7 @@ function App() {
         throw new Error(`Invalid Algorand address format: ${currentAccount}`);
       }
       
-      // Step 1: Create claim and get transaction to sign
+      // Step 1: Create claim and get transaction(s) to sign
       const claimResponse = await createClaim({
         amount: parseFloat(amount),
         recipient: recipient.trim(),
@@ -258,17 +321,22 @@ function App() {
         senderAddress: currentAccount
       });
 
-      // Step 2: Decode and sign the transaction
+      // Step 2: Sign the single transaction
+      console.log('Signing single app creation transaction...');
       const txnBuffer = Buffer.from(claimResponse.deploymentTransaction, 'base64');
       const transaction = algosdk.decodeUnsignedTransaction(txnBuffer);
       
       const signedTxn = await signTransaction(transaction);
       
+      const signedTxnData = {
+        signedTransaction: Buffer.from(signedTxn).toString('base64')
+      };
+      
       setStep('submitting');
 
-      // Step 3: Submit the signed transaction with claim details
+      // Step 3: Submit the signed transaction(s) with claim details
       const submitResponse = await submitTransaction({
-        signedTransaction: Buffer.from(signedTxn).toString('base64'),
+        ...signedTxnData,
         claimDetails: {
           recipient: claimResponse.claimDetails.recipient,
           amount: claimResponse.claimDetails.amount,
@@ -277,88 +345,48 @@ function App() {
         }
       });
 
-      // Step 4: Fund the contract with the claim amount
-      setStep('submitting');
-      console.log(`Funding contract ${submitResponse.applicationId} at ${submitResponse.contractAddress} with ${amount} ALGO...`);
-      
-      // Get current account again to ensure we have the right address
-      const fundingAccount = await getConnectedAccount();
-      if (!fundingAccount) {
-        throw new Error('Unable to get connected account for funding');
-      }
-      
+      // Handle contract funding separately if needed (atomic group handles app creation + seed only)
       let fundingTransactionId: string | undefined;
-      let seedTransactionId: string | undefined;
       
-      try {
-        // Get seed wallet info
-        const seedWalletInfo = await getSeedWalletAddress();
-        const seedContribution = seedWalletInfo.configured ? (seedWalletInfo.recommendedContribution || 0.005) : 0;
+      if (submitResponse.applicationId) {
+        console.log(`Funding contract ${submitResponse.applicationId} at ${submitResponse.contractAddress}...`);
         
-        // Create contract funding transaction (without seed contribution)
-        const contractFundingAmount = 0.1 + parseFloat(amount) + 0.005; // Contract min balance + claim amount + fees
-        console.log(`Creating contract funding transaction for ${contractFundingAmount} ALGO (0.1 min balance + ${amount} claim + 0.005 fees)`);
-        
-        const fundingTxn = await fundContract({
-          applicationId: submitResponse.applicationId,
-          amount: contractFundingAmount,
-          senderAddress: fundingAccount
-        });
-        
-        console.log(`Signing contract funding transaction...`);
-        const signedFundingTxn = await signTransaction(fundingTxn.transactionToSign);
-        
-        console.log(`Submitting contract funding transaction...`);
-        const fundingResponse = await submitFundingTransaction({
-          signedTransaction: Buffer.from(signedFundingTxn).toString('base64'),
-          claimCode: claimResponse.claimCode
-        });
-        
-        fundingTransactionId = fundingResponse.transactionId;
-        console.log(`✅ Contract funded successfully:`);
-        console.log(`   - Funding TX: ${fundingResponse.transactionId}`);
-        console.log(`   - Amount: ${contractFundingAmount} ALGO`);
-        console.log(`   - Contract: ${submitResponse.contractAddress}`);
-        
-        // Create seed wallet contribution transaction if seed wallet is configured
-        if (seedWalletInfo.configured && seedContribution > 0) {
-          console.log(`Creating seed wallet contribution transaction for ${seedContribution} ALGO to ${seedWalletInfo.address}`);
+        try {
+          const fundingAccount = await getConnectedAccount();
+          if (!fundingAccount) {
+            throw new Error('Unable to get connected account for funding');
+          }
           
-          // Create manual payment transaction to seed wallet
-          const networkConfig = getNetworkConfig();
-          const algodClient = new algosdk.Algodv2('', networkConfig.algodServer, networkConfig.algodPort);
-          const suggestedParams = await algodClient.getTransactionParams().do();
+          const contractFundingAmount = 0.1 + parseFloat(amount); // min balance + claim amount
+          console.log(`Creating contract funding transaction for ${contractFundingAmount} ALGO`);
           
-          const seedPaymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-            sender: fundingAccount,
-            receiver: seedWalletInfo.address!,
-            amount: Math.floor(seedContribution * 1000000), // Convert to microAlgos
-            suggestedParams: suggestedParams,
-            note: new TextEncoder().encode('RandCash seed wallet contribution')
+          const fundingTxn = await fundContract({
+            applicationId: submitResponse.applicationId,
+            amount: contractFundingAmount,
+            senderAddress: fundingAccount
           });
           
-          console.log(`Signing seed contribution transaction...`);
-          const signedSeedTxn = await signTransaction(Buffer.from(algosdk.encodeUnsignedTransaction(seedPaymentTxn)).toString('base64'));
+          console.log(`Signing contract funding transaction...`);
+          const signedFundingTxn = await signTransaction(fundingTxn.transactionToSign);
           
-          console.log(`Submitting seed contribution transaction...`);
-          const seedResponse = await submitFundingTransaction({
-            signedTransaction: Buffer.from(signedSeedTxn).toString('base64')
+          console.log(`Submitting contract funding transaction...`);
+          const fundingResponse = await submitFundingTransaction({
+            signedTransaction: Buffer.from(signedFundingTxn).toString('base64'),
+            claimCode: claimResponse.claimCode
           });
           
-          seedTransactionId = seedResponse.transactionId;
-          console.log(`✅ Seed wallet contribution successful:`);
-          console.log(`   - Seed TX: ${seedResponse.transactionId}`);
-          console.log(`   - Amount: ${seedContribution} ALGO`);
-          console.log(`   - To seed wallet: ${seedWalletInfo.address}`);
+          fundingTransactionId = fundingResponse.transactionId;
+          console.log(`✅ Contract funded successfully: ${fundingResponse.transactionId}`);
+        } catch (fundingError) {
+          console.error('❌ Contract funding failed:', fundingError);
+          setError(`Contract created but funding failed: ${fundingError instanceof Error ? fundingError.message : 'Unknown error'}.`);
         }
-        
-      } catch (fundingError) {
-        console.error('❌ Funding failed:', fundingError);
-        // Still show success but warn about funding
-        setError(`Contract created but funding failed: ${fundingError instanceof Error ? fundingError.message : 'Unknown error'}. The recipient won't be able to claim until the contract is funded.`);
       }
 
-      // Step 3: Show success result with all details
+      // Step 4: Show success result
+      const amountValue = parseFloat(amount);
+      console.log('Setting result with amount:', amountValue, 'from form value:', amount);
+      
       setResult({
         claimCode: claimResponse.claimCode,
         transactionId: submitResponse.transactionId,
@@ -367,18 +395,15 @@ function App() {
         notificationSent: submitResponse.notificationSent || false,
         notificationMethod: submitResponse.notificationMethod || 'pending',
         recipient: recipient.trim(),
-        amount: parseFloat(amount),
+        amount: amountValue,
         message: message.trim(),
-        fundingTransactionId: fundingTransactionId,
-        seedTransactionId: seedTransactionId
+        fundingTransactionId: fundingTransactionId
       });
 
       setStep('complete');
       
-      // Reset form
-      setAmount('');
-      setRecipient('');
-      setMessage('');
+      // Don't reset form immediately - let user see the success page with the amount
+      // Form will be reset when they click "Send Another Payment"
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process transaction');
       setStep('form');
@@ -399,7 +424,7 @@ function App() {
     }
 
     setClaimLoading(true);
-    setClaimStep('submitting');
+    setClaimStep('signing');
 
     try {
       // Get fresh account from wallet service
@@ -414,57 +439,125 @@ function App() {
         throw new Error(`Invalid Algorand address format: ${currentAccount}`);
       }
 
-      // Step 1: Get the claim transaction to sign
-      const claimResponse = await claimFunds({
-        claimCode: claimCode.trim().toUpperCase(),
+      // Step 1: Create claim transaction to sign
+      const claimResponse = await claimWithCode({
+        applicationId: parseInt(applicationId),
+        claimCode: claimCode.trim(),
         walletAddress: currentAccount
       });
 
-      // Check if we need to sign a transaction
-      if (claimResponse.requiresSigning && claimResponse.transactionToSign) {
-        setClaimStep('signing');
-        
-        // Debug: Check what we received
-        console.log('🔍 Claim response:', claimResponse);
-        console.log('🔍 Transaction to sign type:', typeof claimResponse.transactionToSign);
-        console.log('🔍 Transaction to sign value:', claimResponse.transactionToSign);
-        
-        // Validate transaction data before signing
-        if (!claimResponse.transactionToSign || typeof claimResponse.transactionToSign !== 'string') {
-          throw new Error('Invalid transaction data received from server');
-        }
-        
-        // Sign the transaction using the wallet service
-        const signedTxn = await signTransaction(claimResponse.transactionToSign);
-        
-        setClaimStep('submitting');
-        
-        // Step 2: Submit the signed transaction
-        const submitResponse = await submitClaim({
-          signedTransaction: Buffer.from(signedTxn).toString('base64'),
-          claimCode: claimResponse.claimCode!
-        });
+      // Step 2: Sign the claim transaction
+      console.log('🔍 Signing claim transaction...');
+      const txnBuffer = Buffer.from(claimResponse.transactionToSign, 'base64');
+      const transaction = algosdk.decodeUnsignedTransaction(txnBuffer);
+      
+      const signedTxn = await signTransaction(transaction);
+      
+      setClaimStep('submitting');
 
-        setClaimResult({
-          success: true,
-          transactionId: submitResponse.transactionId,
-          amount: submitResponse.amount,
-          message: submitResponse.message
-        });
-      } else {
-        // Direct success (shouldn't happen with new flow, but handle for safety)
-        setClaimResult(claimResponse);
+      // Step 3: Submit the signed transaction directly to Algorand
+      const algodClient = new algosdk.Algodv2('', getCurrentNetwork() === 'testnet' ? 'https://testnet-api.4160.nodely.dev' : 'https://mainnet-api.4160.nodely.dev', 443);
+      const txResponse = await algodClient.sendRawTransaction(signedTxn).do();
+      const txId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
+      
+      if (!txId) {
+        throw new Error('No transaction ID returned from submission');
       }
+
+      // Step 4: Wait for confirmation
+      console.log('⏳ Waiting for claim transaction confirmation...');
+      const confirmedTxn = await algosdk.waitForConfirmation(algodClient, txId, 15);
+      
+      // Check the logs to see how much was claimed
+      let claimedAmount = 0;
+      if (confirmedTxn.logs && confirmedTxn.logs.length > 0) {
+        // Contract should log the amount being claimed
+        console.log('📝 Transaction logs:', confirmedTxn.logs);
+      }
+
+      setClaimResult({
+        success: true,
+        transactionId: txId,
+        amount: claimedAmount, // We'll need to get this from contract state
+        message: 'Funds claimed successfully!'
+      });
       
       setClaimStep('complete');
       
       // Reset form
       setClaimCode('');
+      setApplicationId('');
     } catch (err) {
       setClaimError(err instanceof Error ? err.message : 'Failed to claim funds');
       setClaimStep('form');
     } finally {
       setClaimLoading(false);
+    }
+  };
+
+  const handleRefund = async () => {
+    setRefundError('');
+    setRefundResult(null);
+
+    if (!validateRefundForm()) return;
+
+    if (!connectedAccount) {
+      setRefundError('No wallet account connected. Please connect your wallet first.');
+      return;
+    }
+
+    setRefundLoading(true);
+    setRefundStep('signing');
+
+    try {
+      console.log('Creating refund transaction for Application ID:', refundApplicationId);
+      
+      // Get fresh account from wallet service
+      const currentAccount = await getConnectedAccount();
+      
+      if (!currentAccount) {
+        throw new Error('Unable to get connected account from wallet');
+      }
+      
+      // Step 1: Create refund transaction
+      const refundResponse = await refundFunds({
+        applicationId: parseInt(refundApplicationId),
+        walletAddress: currentAccount
+      });
+
+      // Step 2: Sign the refund transaction
+      console.log('Signing refund transaction...');
+      const signedTxn = await signTransaction(refundResponse.transactionToSign);
+      
+      // Convert signed transaction to base64
+      const signedTxnB64 = Buffer.from(signedTxn).toString('base64');
+      
+      setRefundStep('submitting');
+      console.log('Submitting refund transaction...');
+      
+      // Step 3: Submit the signed transaction  
+      const submitResponse = await submitTransaction({
+        signedTransaction: signedTxnB64
+      });
+
+      console.log('✅ Refund transaction confirmed:', submitResponse.transactionId);
+
+      setRefundResult({
+        success: true,
+        transactionId: submitResponse.transactionId,
+        amount: 0, // We'll need to get this from contract state if needed
+        message: 'Funds refunded successfully!'
+      });
+      
+      setRefundStep('complete');
+      
+      // Reset form
+      setRefundApplicationId('');
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : 'Failed to refund funds');
+      setRefundStep('form');
+    } finally {
+      setRefundLoading(false);
     }
   };
 
@@ -482,12 +575,22 @@ function App() {
     setResult(null);
     setStep('form');
     setError('');
+    // Reset form fields for new transaction
+    setAmount('');
+    setRecipient('');
+    setMessage('');
   };
 
   const handleClaimAnother = () => {
     setClaimResult(null);
     setClaimStep('form');
     setClaimError('');
+  };
+
+  const handleRefundAnother = () => {
+    setRefundResult(null);
+    setRefundStep('form');
+    setRefundError('');
   };
 
   const isValidEmail = (email: string) => {
@@ -684,6 +787,19 @@ function App() {
                   <span>Claim Funds</span>
                 </div>
               </button>
+              <button
+                onClick={() => handleTabChange('refund')}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
+                  activeTab === 'refund'
+                    ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Refund Funds</span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -709,6 +825,30 @@ function App() {
                 </div>
                 
                 <div className="p-6 space-y-4">
+                  {/* Application ID - Critical for claiming */}
+                  {result.applicationId && (
+                    <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-5 border border-purple-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold text-purple-900">Application ID</h3>
+                        <button
+                          onClick={() => copyToClipboard(result.applicationId!.toString(), 'applicationId')}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
+                        >
+                          <Copy className="w-4 h-4" />
+                          <span>{copiedField === 'applicationId' ? 'Copied!' : 'Copy'}</span>
+                        </button>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 border-2 border-purple-300">
+                        <p className="font-mono text-2xl font-bold text-gray-900 text-center tracking-wider">
+                          {result.applicationId}
+                        </p>
+                      </div>
+                      <p className="text-purple-700 text-sm mt-3 text-center">
+                        The recipient will need this Application ID along with the claim code
+                      </p>
+                    </div>
+                  )}
+
                   {/* Claim Code - Most Important */}
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
                     <div className="flex items-center justify-between mb-3">
@@ -757,20 +897,6 @@ function App() {
                             className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
                           >
                             <span className="font-mono">{result.fundingTransactionId.slice(0, 8)}...{result.fundingTransactionId.slice(-6)}</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      )}
-                      {result.seedTransactionId && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Seed Contribution:</span>
-                          <a
-                            href={getExplorerUrl(result.seedTransactionId)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-                          >
-                            <span className="font-mono">{result.seedTransactionId.slice(0, 8)}...{result.seedTransactionId.slice(-6)}</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>
@@ -837,11 +963,11 @@ function App() {
                         type="number"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.204"
+                        placeholder="0.1"
                         disabled={isLoading}
                         className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
                         step="0.001"
-                        min="0.204"
+                        min="0.1"
                         max={isMainNet() ? "10" : undefined}
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
@@ -852,19 +978,37 @@ function App() {
                       <div className="flex items-center space-x-1">
                         <Info className="w-4 h-4 text-blue-500" />
                         <span>
-                          Minimum 0.204 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.110).toFixed(3) : '0.314'} ALGO 
-                          (includes ~0.105 ALGO for network fees + 0.005 ALGO seed funding contribution)
+                          Minimum 0.1 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.487).toFixed(3) : '0.587'} ALGO 
+                          (includes smart contract deployment for secure, refundable transfers)
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Recipient receives the full amount you enter. Includes automatic seed funding for zero-balance wallets.
-                      </p>
+                      <div className="text-xs text-gray-500 mt-2 space-y-1">
+                        <p>Recipient receives the full amount you enter. Contract deployment enables secure transfers with 5-minute refund protection.</p>
+                        <div className="bg-gray-50 rounded p-2 space-y-1">
+                          <p className="font-medium">Smart contract features:</p>
+                          <p>✓ Secure hash-based claiming (prevents fraud)</p>
+                          <p>✓ 5-minute refund window (get money back if unclaimed)</p>
+                          <p>✓ Double-claim protection (prevents multiple claims)</p>
+                          <p>✓ Automatic execution (no manual intervention needed)</p>
+                        </div>
+                        <div className="bg-blue-50 rounded p-2 mt-2">
+                          <p className="font-medium text-blue-800">Cost breakdown:</p>
+                          <p className="text-blue-700">• Transaction fees: 0.002 ALGO</p>
+                          <p className="text-blue-700">• Contract storage: 0.385 ALGO (enables refunds & security)</p>
+                          <p className="text-blue-700">• Contract minimum: 0.1 ALGO</p>
+                        </div>
+                      </div>
                     </div>
                     {isMainNet() && (
                       <p className="text-xs text-gray-500 mt-1">
                         Maximum: 10 ALGO for safety on MainNet
                       </p>
                     )}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                      <p className="text-yellow-800 text-xs">
+                        <strong>💡 Balance Required:</strong> You need at least ~{amount ? (parseFloat(amount) + 0.487).toFixed(3) : '0.587'} ALGO in your wallet to deploy the smart contract.
+                      </p>
+                    </div>
                   </div>
 
                   {/* Recipient Input */}
@@ -1041,6 +1185,24 @@ function App() {
                     </div>
                   )}
 
+                  {/* Application ID Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Application ID
+                    </label>
+                    <input
+                      type="number"
+                      value={applicationId}
+                      onChange={(e) => setApplicationId(e.target.value)}
+                      placeholder="Enter the contract application ID"
+                      disabled={claimLoading}
+                      className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      The application ID of the smart contract (found in the transaction details when the funds were sent).
+                    </p>
+                  </div>
+
                   {/* Claim Code Input */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1055,7 +1217,7 @@ function App() {
                       className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter the claim code you received to claim your funds. Don't worry if your wallet has zero balance - we'll automatically add seed funding if needed.
+                      Enter the claim code you received to claim your funds.
                     </p>
                   </div>
 
@@ -1116,10 +1278,188 @@ function App() {
             <div>
               <h3 className="text-blue-800 font-medium">Wallet Required</h3>
               <p className="text-blue-700 text-sm mt-1">
-                Connect your Pera wallet to {activeTab === 'send' ? 'send' : 'claim'} money securely on Algorand {getNetworkConfig().name}.
+                Connect your Pera wallet to {activeTab === 'send' ? 'send' : activeTab === 'claim' ? 'claim' : 'refund'} money securely on Algorand {getNetworkConfig().name}.
               </p>
             </div>
           </div>
+        )}
+
+        {/* Refund Money Tab */}
+        {activeTab === 'refund' && (
+          <>
+            {/* Refund Success Result */}
+            {refundResult && refundStep === 'complete' && (
+              <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Refund Successful!</h2>
+                      <p className="text-green-100 mt-1">
+                        Your funds have been refunded from contract {refundApplicationId}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6 space-y-4">
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <h4 className="font-medium text-gray-900 text-sm">Transaction Details</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Refund Transaction:</span>
+                        <a
+                          href={getExplorerUrl(refundResult.transactionId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                        >
+                          <span className="font-mono">{refundResult.transactionId.slice(0, 8)}...{refundResult.transactionId.slice(-6)}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button
+                      onClick={handleRefundAnother}
+                      className="flex-1 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                    >
+                      <RefreshCw className="w-5 h-5" />
+                      <span>Refund Another Contract</span>
+                    </button>
+                    <a
+                      href={getExplorerUrl(refundResult.transactionId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                      <span>View Transaction</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Refund Form */}
+            {refundStep !== 'complete' && (
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-red-600 to-rose-600 px-6 py-6">
+                  <h2 className="text-2xl font-bold text-white">Refund Funds</h2>
+                  <p className="text-red-100 mt-1">
+                    Refund unclaimed funds from your contracts on {getNetworkConfig().name}
+                  </p>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                  {/* Progress Indicator */}
+                  {refundStep !== 'form' && (
+                    <div className="bg-blue-50 rounded-xl p-4">
+                      <div className="flex items-center space-x-3">
+                        {refundLoading ? (
+                          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {refundStep === 'signing' && 'Please sign the refund transaction in your wallet...'}
+                            {refundStep === 'submitting' && 'Submitting refund transaction to the network...'}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            This may take a few moments to complete.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error Display */}
+                  {refundError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="text-red-800 font-medium">Refund Failed</h3>
+                        <p className="text-red-700 text-sm mt-1">{refundError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Application ID Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Application ID
+                    </label>
+                    <input
+                      type="text"
+                      value={refundApplicationId}
+                      onChange={(e) => setRefundApplicationId(e.target.value)}
+                      placeholder="Enter the Application ID of the contract to refund"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors font-mono text-lg"
+                      disabled={refundLoading}
+                    />
+                    <p className="text-sm text-gray-500 mt-2">
+                      This should be the Application ID from when you originally sent the funds.
+                    </p>
+                  </div>
+
+                  {/* Important Notice */}
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                    <div className="flex items-start space-x-3">
+                      <Clock className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="text-yellow-800 font-medium">Refund Requirements</h3>
+                        <div className="text-yellow-700 text-sm mt-1 space-y-1">
+                          <p>• You must be the original sender of the contract</p>
+                          <p>• At least 5 minutes must have passed since contract creation</p>
+                          <p>• The funds must not have been claimed yet</p>
+                          <p>• You must connect the same wallet that created the contract</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Connection Status */}
+                  {walletConnected && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <div>
+                          <p className="text-green-800 font-medium">Wallet Connected</p>
+                          <p className="text-green-700 text-sm">
+                            Funds will be refunded to: {connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <button
+                    onClick={handleRefund}
+                    disabled={!walletConnected || refundLoading || !refundApplicationId.trim()}
+                    className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {refundLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Processing Refund...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-5 h-5" />
+                        <span>Refund Funds</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Network Notice */}

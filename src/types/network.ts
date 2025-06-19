@@ -17,7 +17,7 @@ export const NETWORK_CONFIGS: Record<NetworkType, NetworkConfig> = {
     algodServer: 'https://testnet-api.4160.nodely.dev',
     algodPort: 443,
     algodToken: '',
-    explorerUrl: 'https://explorer.perawallet.app',
+    explorerUrl: 'https://testnet.explorer.perawallet.app',
     dispenserUrl: 'https://bank.testnet.algorand.network/'
   },
   mainnet: {
