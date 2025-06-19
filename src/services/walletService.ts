@@ -5,6 +5,15 @@ class WalletService {
   private peraWallet: any = null;
   private connected: boolean = false;
   private account: string = '';
+  
+  // Timeout configuration
+  private readonly INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+  private readonly WARNING_BEFORE_DISCONNECT_MS = 60 * 1000; // 1 minute warning
+  private inactivityTimer: NodeJS.Timeout | null = null;
+  private warningTimer: NodeJS.Timeout | null = null;
+  private activityListeners: Array<{ type: string; handler: () => void }> = [];
+  private onTimeoutWarning?: (timeRemaining: number) => void;
+  private onAutoDisconnect?: () => void;
 
   constructor() {
     this.initializeFromStorage();
@@ -39,6 +48,9 @@ class WalletService {
         this.connected = true;
         localStorage.setItem('wallet_connected', 'true');
         localStorage.setItem('wallet_account', this.account);
+        
+        // Start activity tracking for auto-disconnect
+        this.setupActivityTracking();
       }
     } catch (error) {
       // No existing session to reconnect, which is fine
@@ -61,6 +73,84 @@ class WalletService {
     window.addEventListener('networkChanged', () => {
       this.handleNetworkChange();
     });
+  }
+
+  private setupActivityTracking() {
+    if (!this.connected) return;
+
+    // Define activity events to track
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      this.resetInactivityTimer();
+    };
+
+    // Add event listeners
+    activityEvents.forEach(event => {
+      const listener = { type: event, handler: handleActivity };
+      this.activityListeners.push(listener);
+      document.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    // Start the inactivity timer
+    this.resetInactivityTimer();
+  }
+
+  private cleanupActivityTracking() {
+    // Remove all activity event listeners
+    this.activityListeners.forEach(({ type, handler }) => {
+      document.removeEventListener(type, handler);
+    });
+    this.activityListeners = [];
+
+    // Clear any existing timers
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    if (this.warningTimer) {
+      clearTimeout(this.warningTimer);
+      this.warningTimer = null;
+    }
+  }
+
+  private resetInactivityTimer() {
+    // Clear existing timers
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+    }
+    if (this.warningTimer) {
+      clearTimeout(this.warningTimer);
+    }
+
+    // Set warning timer (1 minute before disconnect)
+    this.warningTimer = setTimeout(() => {
+      if (this.onTimeoutWarning) {
+        this.onTimeoutWarning(this.WARNING_BEFORE_DISCONNECT_MS / 1000); // Convert to seconds
+      }
+    }, this.INACTIVITY_TIMEOUT_MS - this.WARNING_BEFORE_DISCONNECT_MS);
+
+    // Set disconnect timer
+    this.inactivityTimer = setTimeout(() => {
+      this.handleInactivityTimeout();
+    }, this.INACTIVITY_TIMEOUT_MS);
+  }
+
+  private async handleInactivityTimeout() {
+    console.log('Wallet auto-disconnecting due to inactivity');
+    
+    // Notify about auto-disconnect
+    if (this.onAutoDisconnect) {
+      this.onAutoDisconnect();
+    }
+
+    // Disconnect the wallet
+    await this.disconnectWallet();
+  }
+
+  setTimeoutCallbacks(onWarning?: (timeRemaining: number) => void, onDisconnect?: () => void) {
+    this.onTimeoutWarning = onWarning;
+    this.onAutoDisconnect = onDisconnect;
   }
 
   private async handleNetworkChange() {
@@ -117,6 +207,9 @@ class WalletService {
       localStorage.setItem('wallet_connected', 'true');
       localStorage.setItem('wallet_account', this.account);
       
+      // Start activity tracking for auto-disconnect
+      this.setupActivityTracking();
+      
       return this.account;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -146,6 +239,9 @@ class WalletService {
       this.connected = false;
       this.account = '';
       
+      // Clean up activity tracking
+      this.cleanupActivityTracking();
+      
       localStorage.removeItem('wallet_connected');
       localStorage.removeItem('wallet_account');
     } catch (error) {
@@ -165,7 +261,7 @@ class WalletService {
     return this.account;
   }
 
-  async signTransaction(transaction: algosdk.Transaction | string): Promise<Uint8Array> {
+  async signTransaction(transaction: algosdk.Transaction | algosdk.Transaction[] | string): Promise<Uint8Array | Uint8Array[]> {
     if (!this.connected) {
       throw new Error('Wallet not connected');
     }
@@ -180,7 +276,67 @@ class WalletService {
         throw new Error('Transaction is required but was undefined or null');
       }
 
-      // If transaction is a base64 string, decode it first
+      // Handle atomic transaction groups (array of transactions)
+      if (Array.isArray(transaction)) {
+        console.log(`🔍 [Wallet] Signing atomic group of ${transaction.length} transactions`);
+        
+        try {
+          // Try the correct Pera Wallet format for atomic groups
+          console.log(`🔍 [Wallet] Formatting ${transaction.length} transactions for atomic group signing`);
+          
+          const txnsToSign = transaction.map((txn, index) => {
+            console.log(`🔍 [Wallet] Transaction ${index} type:`, typeof txn, txn.constructor?.name);
+            return {
+              txn: txn,
+              signers: [this.account]
+            };
+          });
+          
+          console.log(`🔍 [Wallet] Calling Pera Wallet signTransaction with array of ${txnsToSign.length} items`);
+          
+          // This should sign the atomic group as a whole
+          const signedTxns = await this.peraWallet.signTransaction(txnsToSign);
+          
+          console.log(`✅ [Wallet] Raw response from Pera Wallet:`, signedTxns);
+          console.log(`🔍 [Wallet] Response type:`, typeof signedTxns, 'isArray:', Array.isArray(signedTxns));
+          
+          // Handle the response format
+          if (Array.isArray(signedTxns)) {
+            console.log(`✅ [Wallet] Got array of ${signedTxns.length} signed transactions`);
+            return signedTxns;
+          } else {
+            console.log(`🔍 [Wallet] Got single response, wrapping in array`);
+            return [signedTxns];
+          }
+        } catch (atomicError) {
+          console.error('❌ [Wallet] Error signing atomic group:', atomicError);
+          console.log('🔄 [Wallet] Falling back to individual transaction signing...');
+          
+          try {
+            // Fallback: sign each transaction individually
+            const signedTxns = [];
+            
+            for (let i = 0; i < transaction.length; i++) {
+              console.log(`🔍 [Wallet] Fallback: Signing transaction ${i} individually`);
+              const txnToSign = [{
+                txn: transaction[i],
+                signers: [this.account]
+              }];
+              
+              const signedTxn = await this.peraWallet.signTransaction(txnToSign);
+              signedTxns.push(signedTxn[0]);
+            }
+            
+            console.log(`✅ [Wallet] Fallback signing completed with ${signedTxns.length} transactions`);
+            return signedTxns;
+          } catch (fallbackError) {
+            console.error('❌ [Wallet] Fallback signing also failed:', fallbackError);
+            throw new Error(`Failed to sign transactions: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+          }
+        }
+      }
+
+      // Handle single transaction
       let txn: algosdk.Transaction;
       if (typeof transaction === 'string') {
         if (transaction.trim() === '') {
@@ -226,5 +382,7 @@ export const connectWallet = () => walletService.connectWallet();
 export const disconnectWallet = () => walletService.disconnectWallet();
 export const isWalletConnected = () => walletService.isWalletConnected();
 export const getConnectedAccount = () => walletService.getConnectedAccount();
-export const signTransaction = (transaction: algosdk.Transaction | string) => walletService.signTransaction(transaction);
+export const signTransaction = (transaction: algosdk.Transaction | algosdk.Transaction[] | string) => walletService.signTransaction(transaction);
 export const getWalletType = () => walletService.getWalletType();
+export const setWalletTimeoutCallbacks = (onWarning?: (timeRemaining: number) => void, onDisconnect?: () => void) => 
+  walletService.setTimeoutCallbacks(onWarning, onDisconnect);

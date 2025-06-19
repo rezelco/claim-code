@@ -50,20 +50,29 @@ interface SubmitTransactionResponse {
   notificationMethod?: string;
 }
 
-interface ClaimFundsRequest {
+interface ClaimWithCodeRequest {
+  applicationId: number;
   claimCode: string;
   walletAddress: string;
   network: string;
 }
 
-interface ClaimFundsResponse {
-  success: boolean;
-  transactionId?: string;
-  amount: number;
-  message?: string;
-  requiresSigning?: boolean;
-  transactionToSign?: string;
-  claimCode?: string;
+interface ClaimWithCodeResponse {
+  transactionToSign: string;
+  transactionId: string;
+  applicationId: number;
+}
+
+interface RefundFundsRequest {
+  applicationId: number;
+  walletAddress: string;
+  network: string;
+}
+
+interface RefundFundsResponse {
+  transactionToSign: string;
+  transactionId: string;
+  applicationId: number;
 }
 
 interface SubmitClaimRequest {
@@ -130,10 +139,10 @@ export const submitTransaction = async (request: Omit<SubmitTransactionRequest, 
   }
 };
 
-export const claimFunds = async (request: Omit<ClaimFundsRequest, 'network'>): Promise<ClaimFundsResponse> => {
+export const claimWithCode = async (request: Omit<ClaimWithCodeRequest, 'network'>): Promise<ClaimWithCodeResponse> => {
   try {
     const network = getCurrentNetwork();
-    const response = await fetch('/api/claim-funds', {
+    const response = await fetch('/api/claim-with-code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -143,7 +152,7 @@ export const claimFunds = async (request: Omit<ClaimFundsRequest, 'network'>): P
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to claim funds');
+      throw new Error(errorData.error || 'Failed to create claim transaction');
     }
 
     return await response.json();
@@ -151,7 +160,32 @@ export const claimFunds = async (request: Omit<ClaimFundsRequest, 'network'>): P
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Network error occurred while claiming funds');
+    throw new Error('Network error occurred while creating claim transaction');
+  }
+};
+
+export const refundFunds = async (request: Omit<RefundFundsRequest, 'network'>): Promise<RefundFundsResponse> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch('/api/refund-funds', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, network }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create refund transaction');
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while creating refund transaction');
   }
 };
 
@@ -262,5 +296,35 @@ export const checkHealth = async () => {
     return await response.json();
   } catch (error) {
     throw new Error('Failed to check API health');
+  }
+};
+
+interface SeedWalletInfo {
+  configured: boolean;
+  address?: string;
+  balance?: number;
+  recommendedContribution?: number;
+}
+
+export const getSeedWalletAddress = async (): Promise<SeedWalletInfo> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch(`/api/seed-wallet-address?network=${network}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (response.status === 503) {
+        // Seed wallet not configured
+        return { configured: false };
+      }
+      throw new Error(errorData.error || 'Failed to get seed wallet address');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while getting seed wallet address');
   }
 };
