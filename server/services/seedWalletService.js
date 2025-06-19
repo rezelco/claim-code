@@ -57,13 +57,31 @@ class SeedWalletService {
       return false;
     }
 
+    // Normalize the mnemonic string - remove extra whitespace and ensure single spaces
+    const normalizedMnemonic = this.seedMnemonic
+      .trim()                           // Remove leading/trailing whitespace
+      .replace(/\s+/g, ' ')            // Replace multiple whitespace with single space
+      .toLowerCase();                   // Convert to lowercase for consistency
+
     try {
-      // Validate mnemonic format
-      const words = this.seedMnemonic.trim().split(/\s+/);
-      if (words.length !== 25) {
-        console.error('❌ Seed mnemonic must be exactly 25 words');
+      // Validate mnemonic format - support both 24 and 25 word mnemonics
+      const words = normalizedMnemonic.split(' ');
+      if (!(words.length === 24 || words.length === 25)) {
+        console.error(`❌ Seed mnemonic must be exactly 24 or 25 words, got ${words.length} words`);
         return false;
       }
+
+      // Test if we can derive an account from the normalized mnemonic
+      const account = algosdk.mnemonicToSecretKey(normalizedMnemonic);
+      
+      // Check if the derived address looks valid (58 characters, proper format)
+      if (!account.addr || account.addr.length !== 58) {
+        console.error('❌ Invalid seed wallet mnemonic - derived address has wrong length');
+        console.error(`   - Derived address: ${account.addr}`);
+        console.error(`   - Address length: ${account.addr?.length || 0} (should be 58)`);
+        return false;
+      }
+
 
       // Test if we can derive an account from the mnemonic
       const account = algosdk.mnemonicToSecretKey(this.seedMnemonic);
@@ -78,6 +96,8 @@ class SeedWalletService {
       return true;
     } catch (error) {
       console.error('❌ Error validating seed mnemonic:', error.message);
+      console.error('   - This usually indicates an invalid mnemonic phrase');
+      console.error('   - Please verify your mnemonic is correct and properly formatted');
       return false;
     }
   }
