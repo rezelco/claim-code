@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock, Trash2, List } from 'lucide-react';
+import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock, Trash2, List, Eye, EyeOff } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction, setWalletTimeoutCallbacks } from './services/walletService';
 import { createClaim, submitTransaction, claimWithCode, refundFunds, fundContract, submitFundingTransaction, checkClaimStatus, getWalletContracts, deleteContract, submitDelete } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
@@ -48,9 +48,11 @@ function App() {
   const [step, setStep] = useState<'form' | 'signing' | 'submitting' | 'complete'>('form');
   const [showReconnectPrompt, setShowReconnectPrompt] = useState(false);
   const [copiedField, setCopiedField] = useState<string>('');
+  const [showResultClaimCode, setShowResultClaimCode] = useState(false);
 
   // Claim Money State
   const [claimCode, setClaimCode] = useState('');
+  const [showClaimCode, setShowClaimCode] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimResult, setClaimResult] = useState<ClaimFundsResult | null>(null);
   const [claimError, setClaimError] = useState<string>('');
@@ -104,6 +106,7 @@ function App() {
         setRecipient('');
         setMessage('');
         setClaimCode('');
+        setShowClaimCode(false);
         setRefundApplicationId('');
       }
     );
@@ -647,6 +650,7 @@ function App() {
       
       // Reset form
       setClaimCode('');
+      setShowClaimCode(false);
     } catch (err) {
       console.error('❌ Claim failed:', err);
       
@@ -755,6 +759,7 @@ function App() {
     setResult(null);
     setStep('form');
     setError('');
+    setShowResultClaimCode(false);
     // Reset form fields for new transaction
     setAmount('');
     setRecipient('');
@@ -765,6 +770,7 @@ function App() {
     setClaimResult(null);
     setClaimStep('form');
     setClaimError('');
+    setShowClaimCode(false);
   };
 
   const handleRefundAnother = () => {
@@ -1086,18 +1092,43 @@ function App() {
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-semibold text-blue-900">Claim Code</h3>
-                        <button
-                          onClick={() => copyToClipboard(`${result.applicationId}-${result.claimCode}`, 'claimCode')}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-                        >
-                          <Copy className="w-4 h-4" />
-                          <span>{copiedField === 'claimCode' ? 'Copied!' : 'Copy'}</span>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setShowResultClaimCode(!showResultClaimCode)}
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors"
+                            title={showResultClaimCode ? "Hide claim code" : "Show claim code"}
+                          >
+                            {showResultClaimCode ? (
+                              <>
+                                <EyeOff className="w-4 h-4" />
+                                <span>Hide</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-4 h-4" />
+                                <span>Show</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => copyToClipboard(`${result.applicationId}-${result.claimCode}`, 'claimCode')}
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                          >
+                            <Copy className="w-4 h-4" />
+                            <span>{copiedField === 'claimCode' ? 'Copied!' : 'Copy'}</span>
+                          </button>
+                        </div>
                       </div>
                       <div className="bg-white rounded-lg p-4 border-2 border-blue-300">
-                        <p className="font-mono text-lg font-bold text-gray-900 text-center tracking-wider break-all">
-                          {result.applicationId}-{result.claimCode}
-                        </p>
+                        {showResultClaimCode ? (
+                          <p className="font-mono text-lg font-bold text-gray-900 text-center tracking-wider break-all">
+                            {result.applicationId}-{result.claimCode}
+                          </p>
+                        ) : (
+                          <p className="font-mono text-lg font-bold text-gray-400 text-center tracking-wider">
+                            •••••••••-••••••••••••••••••
+                          </p>
+                        )}
                       </div>
                       <p className="text-blue-700 text-sm mt-3 text-center">
                         Share this code with the recipient to claim their funds
@@ -1215,22 +1246,6 @@ function App() {
                           Minimum 0.1 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.487).toFixed(3) : '0.587'} ALGO 
                           (includes smart contract deployment for secure, refundable transfers)
                         </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-2 space-y-1">
-                        <p>Recipient receives the full amount you enter. Contract deployment enables secure transfers with 5-minute refund protection.</p>
-                        <div className="bg-gray-50 rounded p-2 space-y-1">
-                          <p className="font-medium">Smart contract features:</p>
-                          <p>✓ Secure hash-based claiming (prevents fraud)</p>
-                          <p>✓ 5-minute refund window (get money back if unclaimed)</p>
-                          <p>✓ Double-claim protection (prevents multiple claims)</p>
-                          <p>✓ Automatic execution (no manual intervention needed)</p>
-                        </div>
-                        <div className="bg-blue-50 rounded p-2 mt-2">
-                          <p className="font-medium text-blue-800">Cost breakdown:</p>
-                          <p className="text-blue-700">• Transaction fees: 0.002 ALGO</p>
-                          <p className="text-blue-700">• Contract storage: 0.385 ALGO (enables refunds & security)</p>
-                          <p className="text-blue-700">• Contract minimum: 0.1 ALGO</p>
-                        </div>
                       </div>
                     </div>
                     {isMainNet() && (
@@ -1424,14 +1439,29 @@ function App() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Claim Code
                     </label>
-                    <input
-                      type="text"
-                      value={claimCode}
-                      onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
-                      placeholder="e.g., 741503729-A1B2C3D4E5F6G7H8"
-                      disabled={claimLoading}
-                      className="w-full px-4 py-3 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showClaimCode ? "text" : "password"}
+                        value={claimCode}
+                        onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
+                        placeholder="e.g., 741503729-A1B2C3D4E5F6G7H8"
+                        disabled={claimLoading}
+                        className="w-full px-4 py-3 pr-12 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowClaimCode(!showClaimCode)}
+                        disabled={claimLoading}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                        title={showClaimCode ? "Hide claim code" : "Show claim code"}
+                      >
+                        {showClaimCode ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Enter the claim code you received (includes both app ID and claim code).
                     </p>
