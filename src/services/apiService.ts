@@ -1,4 +1,3 @@
-import algosdk from 'algosdk';
 import { getCurrentNetwork } from './networkService';
 
 interface CreateClaimRequest {
@@ -294,7 +293,7 @@ export const checkHealth = async () => {
     const network = getCurrentNetwork();
     const response = await fetch(`/api/health?network=${network}`);
     return await response.json();
-  } catch (error) {
+  } catch {
     throw new Error('Failed to check API health');
   }
 };
@@ -359,12 +358,12 @@ export const checkClaimStatus = async (request: Omit<CheckClaimStatusRequest, 'n
       try {
         const errorData = await response.json();
         errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
+      } catch {
         // If JSON parsing fails, use response text or status
         try {
           const errorText = await response.text();
           errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`;
-        } catch (textError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
       }
@@ -373,7 +372,7 @@ export const checkClaimStatus = async (request: Omit<CheckClaimStatusRequest, 'n
 
     try {
       return await response.json();
-    } catch (parseError) {
+    } catch {
       throw new Error('Invalid response format from claim status service');
     }
   } catch (error) {
@@ -381,5 +380,125 @@ export const checkClaimStatus = async (request: Omit<CheckClaimStatusRequest, 'n
       throw error;
     }
     throw new Error('Network error occurred while checking claim status');
+  }
+};
+
+interface WalletContract {
+  applicationId: number;
+  contractAddress: string;
+  status: string;
+  amount: number;
+  balance: number;
+  claimed: boolean;
+  canRefund: boolean;
+  canDelete: boolean;
+  createdTimestamp: number;
+  createdDate: string | null;
+}
+
+interface GetWalletContractsResponse {
+  walletAddress: string;
+  network: string;
+  contracts: WalletContract[];
+  totalContracts: number;
+  activeContracts: number;
+  claimedContracts: number;
+  refundableContracts: number;
+  deletableContracts: number;
+}
+
+export const getWalletContracts = async (walletAddress: string): Promise<GetWalletContractsResponse> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch(`/api/wallet-contracts?walletAddress=${encodeURIComponent(walletAddress)}&network=${network}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to get wallet contracts');
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while getting wallet contracts');
+  }
+};
+
+interface DeleteContractRequest {
+  applicationId: number;
+  walletAddress: string;
+  network: string;
+}
+
+interface DeleteContractResponse {
+  transactionToSign: string;
+  transactionId: string;
+  applicationId: number;
+  message: string;
+}
+
+export const deleteContract = async (request: Omit<DeleteContractRequest, 'network'>): Promise<DeleteContractResponse> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch('/api/delete-contract', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, network }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create delete transaction');
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while creating delete transaction');
+  }
+};
+
+interface SubmitDeleteRequest {
+  signedTransaction: string;
+  applicationId: number;
+  network: string;
+}
+
+interface SubmitDeleteResponse {
+  success: boolean;
+  transactionId: string;
+  applicationId: number;
+  confirmedRound: number;
+  message: string;
+}
+
+export const submitDelete = async (request: Omit<SubmitDeleteRequest, 'network'>): Promise<SubmitDeleteResponse> => {
+  try {
+    const network = getCurrentNetwork();
+    const response = await fetch('/api/submit-delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, network }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to submit delete transaction');
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error occurred while submitting delete transaction');
   }
 };

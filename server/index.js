@@ -1528,6 +1528,267 @@ app.post('/api/refund-funds', async (req, res) => {
   }
 });
 
+// API endpoint to get all contracts created by a wallet
+app.get('/api/wallet-contracts/:walletAddress', async (req, res) => {
+  try {
+    const { walletAddress } = req.params;
+    const network = req.query.network || 'testnet';
+    
+    console.log(`📥 Received wallet-contracts request for ${walletAddress.substring(0, 8)}... on ${network}`);
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    // Validate wallet address
+    let validatedWalletAddress;
+    try {
+      validatedWalletAddress = validateAlgorandAddress(walletAddress);
+    } catch (addressError) {
+      return res.status(400).json({ error: `Invalid wallet address: ${addressError.message}` });
+    }
+    
+    const algodClient = createAlgodClient(network);
+    
+    // Get account information to find created applications
+    const accountInfo = await algodClient.accountInformation(validatedWalletAddress).do();
+    const createdApps = accountInfo['created-apps'] || [];
+    
+    console.log(`📝 Found ${createdApps.length} applications created by wallet`);
+    
+    const contracts = [];
+    
+    // For each created application, get its current state
+    for (const app of createdApps) {
+      try {
+        const appId = app.id;
+        const appAddress = algosdk.getApplicationAddress(appId);
+        
+        // Get application global state
+        const appInfo = await algodClient.getApplicationByID(appId).do();
+        const globalState = appInfo.params['global-state'] || [];
+        
+        // Parse global state
+        const parsedState = {};
+        globalState.forEach(item => {
+          const key = Buffer.from(item.key, 'base64').toString();
+          let value;
+          if (item.value.type === 1) { // bytes
+            value = Buffer.from(item.value.bytes, 'base64');
+          } else if (item.value.type === 2) { // uint
+            value = item.value.uint;
+          }
+          parsedState[key] = value;
+        });
+        
+        // Get contract account balance
+        let contractBalance = 0;
+        try {
+          const contractAccountInfo = await algodClient.accountInformation(appAddress).do();
+          contractBalance = Number(contractAccountInfo.amount) / 1000000; // Convert to ALGO
+        } catch (balanceError) {
+          console.log(`⚠️ Could not get balance for contract ${appId}: ${balanceError.message}`);
+        }
+        
+        // Determine contract status
+        const claimed = parsedState.claimed === 1;
+        const amount = parsedState.amount ? Number(parsedState.amount) / 1000000 : 0;
+        const created = parsedState.created || 0;
+        const currentTime = Math.floor(Date.now() / 1000);
+        const canRefund = !claimed && (currentTime - created) > 300; // 5 minutes
+        const canDelete = contractBalance === 0;
+        
+        let status = 'Unknown';
+        if (claimed) {
+          status = 'Claimed';
+        } else if (contractBalance > 0) {
+          status = canRefund ? 'Refundable' : 'Active';
+        } else {
+          status = 'Empty';
+        }
+        
+        contracts.push({
+          applicationId: appId,
+          contractAddress: appAddress.toString(),
+          status: status,
+          amount: amount,
+          balance: contractBalance,
+          claimed: claimed,
+          canRefund: canRefund,
+          canDelete: canDelete,
+          createdTimestamp: created,
+          createdDate: created ? new Date(created * 1000).toISOString() : null
+        });
+        
+      } catch (appError) {
+        console.error(`❌ Error processing app ${app.id}:`, appError.message);
+        // Continue with other apps even if one fails
+      }
+    }
+    
+    console.log(`✅ Processed ${contracts.length} contracts for wallet`);
+    
+    res.json({
+      walletAddress: validatedWalletAddress,
+      network: network,
+      contracts: contracts,
+      totalContracts: contracts.length,
+      activeContracts: contracts.filter(c => c.status === 'Active').length,
+      claimedContracts: contracts.filter(c => c.status === 'Claimed').length,
+      refundableContracts: contracts.filter(c => c.canRefund).length,
+      deletableContracts: contracts.filter(c => c.canDelete).length
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting wallet contracts:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to get wallet contracts' 
+    });
+  }
+});
+
+// API endpoint to delete a contract
+app.post('/api/delete-contract', async (req, res) => {
+  try {
+    const { applicationId, walletAddress, network = 'testnet' } = req.body;
+    
+    console.log(`📥 Received delete-contract request for app ${applicationId}`);
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    // Validate inputs
+    if (!applicationId || applicationId <= 0) {
+      return res.status(400).json({ error: 'Valid application ID is required' });
+    }
+    
+    // Validate wallet address
+    let validatedWalletAddress;
+    try {
+      validatedWalletAddress = validateAlgorandAddress(walletAddress);
+    } catch (addressError) {
+      return res.status(400).json({ error: `Invalid wallet address: ${addressError.message}` });
+    }
+    
+    const algodClient = createAlgodClient(network);
+    
+    // Verify the caller is the creator of the application
+    const appInfo = await algodClient.getApplicationByID(applicationId).do();
+    const creator = appInfo.params.creator;
+    
+    if (creator !== validatedWalletAddress) {
+      return res.status(403).json({ 
+        error: 'Only the creator of the application can delete it' 
+      });
+    }
+    
+    // Check if contract has zero balance
+    const appAddress = algosdk.getApplicationAddress(applicationId);
+    const contractAccountInfo = await algodClient.accountInformation(appAddress).do();
+    const contractBalance = Number(contractAccountInfo.amount);
+    
+    if (contractBalance > 0) {
+      return res.status(400).json({
+        error: `Cannot delete contract with non-zero balance. Current balance: ${contractBalance / 1000000} ALGO. Please refund or claim first.`
+      });
+    }
+    
+    // Get suggested parameters
+    const suggestedParams = await algodClient.getTransactionParams().do();
+    
+    // Create application deletion transaction
+    const deleteTxn = algosdk.makeApplicationDeleteTxnFromObject({
+      sender: validatedWalletAddress,
+      suggestedParams: suggestedParams,
+      appIndex: applicationId
+    });
+    
+    // Encode transaction for signing
+    const txnToSign = Buffer.from(algosdk.encodeUnsignedTransaction(deleteTxn)).toString('base64');
+    const txId = deleteTxn.txID();
+    
+    console.log(`✅ Delete transaction created for app ${applicationId}: ${txId}`);
+    
+    res.json({
+      transactionToSign: txnToSign,
+      transactionId: txId,
+      applicationId: applicationId,
+      message: 'Transaction created successfully. Sign and submit to delete the contract.'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error creating delete transaction:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to create delete transaction' 
+    });
+  }
+});
+
+// API endpoint to submit signed delete transaction
+app.post('/api/submit-delete', async (req, res) => {
+  try {
+    const { signedTransaction, applicationId, network = 'testnet' } = req.body;
+    
+    console.log(`📥 Received submit-delete request for app ${applicationId}`);
+    
+    // Validate network
+    if (!NETWORK_CONFIGS[network]) {
+      return res.status(400).json({ error: 'Invalid network specified' });
+    }
+    
+    if (!signedTransaction) {
+      return res.status(400).json({ error: 'Signed transaction is required' });
+    }
+
+    if (!applicationId) {
+      return res.status(400).json({ error: 'Application ID is required' });
+    }
+
+    // Create Algorand client
+    const algodClient = createAlgodClient(network);
+
+    // Decode and submit the signed transaction
+    console.log('📤 Submitting delete transaction to Algorand network...');
+    const signedTxnBytes = new Uint8Array(Buffer.from(signedTransaction, 'base64'));
+    const txResponse = await algodClient.sendRawTransaction(signedTxnBytes).do();
+    
+    // Extract transaction ID
+    const txId = txResponse?.txid || txResponse?.txId || txResponse?.transactionID;
+    
+    if (!txId) {
+      console.error('❌ No transaction ID in response:', txResponse);
+      throw new Error('No valid transaction ID was specified by the network');
+    }
+    
+    console.log(`✅ Delete transaction submitted successfully: ${txId}`);
+    
+    // Wait for confirmation
+    console.log('⏳ Waiting for transaction confirmation...');
+    const confirmedTxn = await algosdk.waitForConfirmation(algodClient, txId, 15);
+    
+    console.log(`✅ Delete transaction confirmed in round ${confirmedTxn['confirmed-round']}`);
+    
+    console.log(`🗑️ Contract ${applicationId} deleted successfully`);
+
+    res.json({
+      success: true,
+      transactionId: txId,
+      applicationId: applicationId,
+      confirmedRound: confirmedTxn['confirmed-round'],
+      message: 'Contract deleted successfully. Minimum balance has been freed.'
+    });
+
+  } catch (error) {
+    console.error('❌ Error submitting delete transaction:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to submit delete transaction' 
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 RandCash API server running on port ${PORT}`);
   console.log(`Supported networks:`);

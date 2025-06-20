@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock } from 'lucide-react';
+import { Send, Wallet, Mail, Phone, MessageSquare, CheckCircle, AlertCircle, Loader2, Info, RefreshCw, AlertTriangle, Copy, ExternalLink, Download, Clock, Trash2, List } from 'lucide-react';
 import { connectWallet, disconnectWallet, getConnectedAccount, isWalletConnected, signTransaction, setWalletTimeoutCallbacks } from './services/walletService';
-import { createClaim, submitTransaction, claimWithCode, submitClaim, refundFunds, fundContract, submitFundingTransaction, getSeedWalletAddress, checkClaimStatus } from './services/apiService';
+import { createClaim, submitTransaction, claimWithCode, refundFunds, fundContract, submitFundingTransaction, checkClaimStatus, getWalletContracts, deleteContract, submitDelete } from './services/apiService';
 import { getCurrentNetwork, getNetworkConfig, isTestNet, isMainNet } from './services/networkService';
 import { NetworkType } from './types/network';
 import NetworkSelector from './components/NetworkSelector';
@@ -35,8 +35,8 @@ function App() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [connectedAccount, setConnectedAccount] = useState<string>('');
   const walletConnectedRef = useRef(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
-  const [currentNetwork, setCurrentNetwork] = useState<NetworkType>(getCurrentNetwork());
+  const [, setForceUpdate] = useState(0);
+  const [, setCurrentNetwork] = useState<NetworkType>(getCurrentNetwork());
   
   // Send Money State
   const [amount, setAmount] = useState('');
@@ -51,7 +51,6 @@ function App() {
 
   // Claim Money State
   const [claimCode, setClaimCode] = useState('');
-  const [applicationId, setApplicationId] = useState('');
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimResult, setClaimResult] = useState<ClaimFundsResult | null>(null);
   const [claimError, setClaimError] = useState<string>('');
@@ -63,6 +62,24 @@ function App() {
   const [refundResult, setRefundResult] = useState<ClaimFundsResult | null>(null);
   const [refundError, setRefundError] = useState<string>('');
   const [refundStep, setRefundStep] = useState<'form' | 'signing' | 'submitting' | 'complete'>('form');
+  
+  // Contract Management State
+  const [contracts, setContracts] = useState<Array<{
+    applicationId: number;
+    contractAddress: string;
+    status: string;
+    amount: number;
+    balance: number;
+    claimed: boolean;
+    canRefund: boolean;
+    canDelete: boolean;
+    createdTimestamp: number;
+    createdDate: string | null;
+  }>>([]);
+  const [contractsLoading, setContractsLoading] = useState(false);
+  const [contractsError, setContractsError] = useState<string>('');
+  const [showContracts, setShowContracts] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState<{[key: number]: boolean}>({});
   
   // Timeout warning state
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
@@ -87,7 +104,6 @@ function App() {
         setRecipient('');
         setMessage('');
         setClaimCode('');
-        setApplicationId('');
         setRefundApplicationId('');
       }
     );
@@ -757,12 +773,85 @@ function App() {
     setRefundError('');
   };
 
+  const loadWalletContracts = async () => {
+    if (!walletConnected || !connectedAccount) {
+      setContractsError('Please connect your wallet first');
+      return;
+    }
+
+    setContractsLoading(true);
+    setContractsError('');
+
+    try {
+      const response = await getWalletContracts(connectedAccount);
+      setContracts(response.contracts);
+    } catch (error) {
+      setContractsError(error instanceof Error ? error.message : 'Failed to load contracts');
+    } finally {
+      setContractsLoading(false);
+    }
+  };
+
+  const handleDeleteContract = async (applicationId: number) => {
+    if (!walletConnected || !connectedAccount) {
+      setContractsError('Please connect your wallet first');
+      return;
+    }
+
+    setDeleteLoading(prev => ({ ...prev, [applicationId]: true }));
+    setContractsError('');
+
+    try {
+      // Create delete transaction
+      const deleteResponse = await deleteContract({
+        applicationId,
+        walletAddress: connectedAccount
+      });
+
+      // Sign the transaction
+      const txnBuffer = Buffer.from(deleteResponse.transactionToSign, 'base64');
+      const transaction = algosdk.decodeUnsignedTransaction(txnBuffer);
+      const signedTxn = await signTransaction(transaction);
+
+      // Submit the transaction
+      const submitResponse = await submitDelete({
+        signedTransaction: Buffer.from(signedTxn).toString('base64'),
+        applicationId
+      });
+
+      console.log(`✅ Contract ${applicationId} deleted successfully: ${submitResponse.transactionId}`);
+      
+      // Reload contracts to reflect changes
+      await loadWalletContracts();
+    } catch (error) {
+      console.error('❌ Failed to delete contract:', error);
+      setContractsError(error instanceof Error ? error.message : 'Failed to delete contract');
+    } finally {
+      setDeleteLoading(prev => ({ ...prev, [applicationId]: false }));
+    }
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'claimed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'refundable':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'empty':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   const isValidPhone = (phone: string) => {
-    return /^\+?[\d\s\-\(\)]{10,}$/.test(phone);
+    return /^\+?[\d\s\-()]{10,}$/.test(phone);
   };
 
   const getRecipientIcon = () => {
@@ -1414,6 +1503,182 @@ function App() {
         {/* Refund Money Tab */}
         {activeTab === 'refund' && (
           <>
+            {/* Contract Management Section */}
+            <div className="mb-8 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-6">
+                <h2 className="text-2xl font-bold text-white">My Contracts</h2>
+                <p className="text-indigo-100 mt-1">
+                  Manage contracts you've created on {getNetworkConfig().name}
+                </p>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {/* Load Contracts Button */}
+                {!showContracts && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => {
+                        setShowContracts(true);
+                        loadWalletContracts();
+                      }}
+                      disabled={!walletConnected || contractsLoading}
+                      className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed"
+                    >
+                      <List className="w-5 h-5" />
+                      <span>Load My Contracts</span>
+                    </button>
+                    <p className="text-gray-600 text-sm mt-2">
+                      View and manage all contracts you've created
+                    </p>
+                  </div>
+                )}
+
+                {/* Contracts Loading */}
+                {showContracts && contractsLoading && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center space-x-3">
+                    <Loader2 className="w-5 h-5 text-indigo-500 animate-spin flex-shrink-0" />
+                    <div>
+                      <p className="text-indigo-800 font-medium">Loading your contracts...</p>
+                      <p className="text-indigo-600 text-sm mt-1">
+                        Fetching contract data from the blockchain
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contracts Error */}
+                {showContracts && contractsError && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="text-red-800 font-medium">Error Loading Contracts</h3>
+                      <p className="text-red-700 text-sm mt-1">{contractsError}</p>
+                      <button
+                        onClick={loadWalletContracts}
+                        className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contracts List */}
+                {showContracts && !contractsLoading && !contractsError && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Your Contracts ({contracts.length})
+                      </h3>
+                      <button
+                        onClick={loadWalletContracts}
+                        disabled={contractsLoading}
+                        className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Refresh</span>
+                      </button>
+                    </div>
+
+                    {contracts.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <List className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No contracts found</p>
+                        <p className="text-sm">Contracts you create will appear here</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {contracts.map((contract) => (
+                          <div
+                            key={contract.applicationId}
+                            className="bg-gray-50 rounded-xl p-4 border border-gray-200"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center space-x-3">
+                                  <span className="font-mono text-lg font-bold text-gray-900">
+                                    App ID: {contract.applicationId}
+                                  </span>
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadgeColor(contract.status)}`}>
+                                    {contract.status}
+                                  </span>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-600">Amount: </span>
+                                    <span className="font-medium">{contract.amount} ALGO</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Balance: </span>
+                                    <span className="font-medium">{contract.balance} ALGO</span>
+                                  </div>
+                                  {contract.createdDate && (
+                                    <div className="col-span-2">
+                                      <span className="text-gray-600">Created: </span>
+                                      <span className="font-medium">
+                                        {new Date(contract.createdDate).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center space-x-2 ml-4">
+                                {/* View on Explorer */}
+                                <a
+                                  href={`${getNetworkConfig().explorerUrl}/application/${contract.applicationId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                                  title="View on Explorer"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+
+                                {/* Refund Button */}
+                                {contract.canRefund && (
+                                  <button
+                                    onClick={() => {
+                                      setRefundApplicationId(contract.applicationId.toString());
+                                      // Scroll to refund form
+                                      setTimeout(() => {
+                                        const refundForm = document.querySelector('[data-refund-form]');
+                                        refundForm?.scrollIntoView({ behavior: 'smooth' });
+                                      }, 100);
+                                    }}
+                                    className="px-3 py-1.5 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg transition-colors font-medium"
+                                  >
+                                    Refund
+                                  </button>
+                                )}
+
+                                {/* Delete Button */}
+                                {contract.canDelete && (
+                                  <button
+                                    onClick={() => handleDeleteContract(contract.applicationId)}
+                                    disabled={deleteLoading[contract.applicationId]}
+                                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Delete Contract"
+                                  >
+                                    {deleteLoading[contract.applicationId] ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Refund Success Result */}
             {refundResult && refundStep === 'complete' && (
               <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl overflow-hidden shadow-lg">
@@ -1474,7 +1739,7 @@ function App() {
 
             {/* Refund Form */}
             {refundStep !== 'complete' && (
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+              <div data-refund-form className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
                 <div className="bg-gradient-to-r from-red-600 to-rose-600 px-6 py-6">
                   <h2 className="text-2xl font-bold text-white">Refund Funds</h2>
                   <p className="text-red-100 mt-1">
