@@ -74,21 +74,11 @@ class SeedWalletService {
       // Test if we can derive an account from the normalized mnemonic
       const account = algosdk.mnemonicToSecretKey(normalizedMnemonic);
       
-      // Check if the derived address looks valid (58 characters, proper format)
-      if (!account.addr || account.addr.length !== 58) {
-        console.error('❌ Invalid seed wallet mnemonic - derived address has wrong length');
-        console.error(`   - Derived address: ${account.addr}`);
-        console.error(`   - Address length: ${account.addr?.length || 0} (should be 58)`);
-        return false;
-      }
-
-
-      // Test if we can derive an account from the mnemonic
-      const account = algosdk.mnemonicToSecretKey(this.seedMnemonic);
-      // In algosdk v3, account.addr is an Address object, need to convert to string
+      // Check if the derived address looks valid
       const addressString = account.addr.toString();
       if (!algosdk.isValidAddress(addressString)) {
         console.error('❌ Invalid seed wallet mnemonic - cannot derive valid address');
+        console.error(`   - Derived address: ${addressString}`);
         return false;
       }
 

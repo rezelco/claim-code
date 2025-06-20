@@ -36,6 +36,12 @@ int NoOp
 ==
 bnz handle_call
 
+// Check if this is a DeleteApplication call
+txn OnCompletion
+int DeleteApplication
+==
+bnz handle_delete
+
 // Reject all other operations
 int 0
 return
@@ -169,6 +175,25 @@ app_global_get
 itxn_field CloseRemainderTo
 itxn_submit
 
+int 1
+return
+
+handle_delete:
+// Only allow deletion by the original sender
+txn Sender
+byte "sender"
+app_global_get
+==
+assert
+
+// Only allow deletion if contract has zero balance
+global CurrentApplicationAddress
+balance
+int 0
+==
+assert
+
+// Allow deletion to proceed
 int 1
 return`;
 

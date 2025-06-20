@@ -18,7 +18,7 @@ export async function sendEmailNotification(recipient, claimCode, amount, messag
   
   try {
     if (!isValidResendConfig) {
-      const notificationMessage = `You've received ${amount} ALGO on RandCash (${networkName})! ${message ? `Message: "${message}"` : ''} Use claim code: ${claimCode}${applicationId ? ` and Application ID: ${applicationId}` : ''} to claim your funds.`;
+      const notificationMessage = `You've received ${amount} ALGO on RandCash (${networkName})! ${message ? `Message: "${message}"` : ''} ${applicationId ? `App ID: ${applicationId}, Claim Code: ${claimCode}` : `Claim code: ${claimCode}`} - use ${applicationId ? 'both codes' : 'this code'} to claim your funds.`;
       console.log(`📧 [SIMULATED EMAIL] To: ${recipient}: ${notificationMessage}`);
       return { success: true, method: 'email_simulation' };
     }
@@ -50,19 +50,25 @@ export async function sendEmailNotification(recipient, claimCode, amount, messag
           
           <div style="background: linear-gradient(135deg, #eff6ff, #dbeafe); border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             ${applicationId ? `
-              <p style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">Application ID:</p>
-              <div style="background: white; border-radius: 8px; padding: 16px; margin: 12px 0; border: 2px solid #7c3aed;">
-                <p style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #1f2937; margin: 0; letter-spacing: 2px;">
+              <p style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">Your Claim Information:</p>
+              <div style="background: white; border-radius: 8px; padding: 16px; margin: 12px 0; border: 2px solid #2563eb;">
+                <p style="color: #6b7280; font-size: 12px; margin: 0 0 8px 0; font-weight: 600;">APP ID</p>
+                <p style="font-family: 'Courier New', monospace; font-size: 20px; font-weight: bold; color: #1f2937; margin: 0 0 12px 0; letter-spacing: 1px;">
                   ${applicationId}
                 </p>
+                <p style="color: #6b7280; font-size: 12px; margin: 0 0 8px 0; font-weight: 600;">CLAIM CODE</p>
+                <p style="font-family: 'Courier New', monospace; font-size: 20px; font-weight: bold; color: #1f2937; margin: 0; letter-spacing: 1px;">
+                  ${claimCode}
+                </p>
               </div>
-            ` : ''}
-            <p style="color: #1e40af; font-size: 16px; font-weight: 600; margin: ${applicationId ? '20px 0 12px 0' : '0 0 12px 0'};">Your Claim Code:</p>
-            <div style="background: white; border-radius: 8px; padding: 16px; margin: 12px 0; border: 2px solid #2563eb;">
-              <p style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #1f2937; margin: 0; letter-spacing: 2px;">
-                ${claimCode}
-              </p>
-            </div>
+            ` : `
+              <p style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 12px 0;">Your Claim Code:</p>
+              <div style="background: white; border-radius: 8px; padding: 16px; margin: 12px 0; border: 2px solid #2563eb;">
+                <p style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #1f2937; margin: 0; letter-spacing: 2px;">
+                  ${claimCode}
+                </p>
+              </div>
+            `}
             <p style="color: #1e40af; font-size: 14px; margin: 12px 0 0 0;">
               ${applicationId ? 'Keep both codes safe - you\'ll need them to claim your funds!' : 'Keep this code safe - you\'ll need it to claim your funds!'}
             </p>
@@ -85,8 +91,9 @@ export async function sendEmailNotification(recipient, claimCode, amount, messag
 
 ${message ? `Message: "${message}"` : ''}
 
-${applicationId ? `Application ID: ${applicationId}
-` : ''}Your claim code: ${claimCode}
+${applicationId ? `Your Claim Information:
+App ID: ${applicationId}
+Claim Code: ${claimCode}` : `Your Claim Code: ${claimCode}`}
 
 Visit RandCash to claim your funds by entering ${applicationId ? 'both codes' : 'this code'} and connecting your wallet.
 
