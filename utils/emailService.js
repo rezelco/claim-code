@@ -1,32 +1,30 @@
-import axios from 'axios';
+import { Resend } from 'resend';
 import { NETWORK_CONFIGS } from './algorandClient.js';
 
-// Initialize Pica/Resend email service
-const picaSecretKey = process.env.PICA_SECRET_KEY;
-const picaConnectionKey = process.env.PICA_RESEND_CONNECTION_KEY;
-const picaFromEmail = process.env.PICA_FROM_EMAIL;
+// Initialize Resend email service
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendFromEmail = process.env.RESEND_FROM_EMAIL || 'send@randcash.app';
 
-const isValidPicaConfig = 
-  picaSecretKey && 
-  picaConnectionKey && 
-  picaFromEmail &&
-  picaSecretKey !== 'your_pica_secret_key' &&
-  picaConnectionKey !== 'your_pica_resend_connection_key' &&
-  picaFromEmail !== 'noreply@randcash.app';
+const isValidResendConfig = 
+  resendApiKey && 
+  resendApiKey !== 'your_resend_api_key' &&
+  resendApiKey.startsWith('re_');
 
-// Send email notification via Pica/Resend
+const resend = isValidResendConfig ? new Resend(resendApiKey) : null;
+
+// Send email notification via Resend
 export async function sendEmailNotification(recipient, claimCode, amount, message, network = 'testnet', applicationId = null) {
   const networkName = NETWORK_CONFIGS[network].name;
   
   try {
-    if (!isValidPicaConfig) {
+    if (!isValidResendConfig) {
       const notificationMessage = `You've received ${amount} ALGO on RandCash (${networkName})! ${message ? `Message: "${message}"` : ''} Use claim code: ${claimCode}${applicationId ? ` and Application ID: ${applicationId}` : ''} to claim your funds.`;
       console.log(`📧 [SIMULATED EMAIL] To: ${recipient}: ${notificationMessage}`);
       return { success: true, method: 'email_simulation' };
     }
 
     const emailData = {
-      from: `RandCash <${picaFromEmail}>`,
+      from: `RandCash <${resendFromEmail}>`,
       to: recipient,
       subject: `You've received ${amount} ALGO on RandCash (${networkName})!`,
       html: `
@@ -100,19 +98,12 @@ Network: Algorand ${networkName}`,
       ]
     };
 
-    console.log('📧 Attempting to send email via Pica API...');
+    console.log('📧 Attempting to send email via Resend API...');
     
-    const response = await axios.post('https://api.picaos.com/v1/passthrough/email', emailData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-pica-secret': picaSecretKey,
-        'x-pica-connection-key': picaConnectionKey,
-        'x-pica-action-id': 'conn_mod_def::GC4q4JE4I28::x8Elxo0VRMK1X-uH1C3NeA',
-      }
-    });
+    const response = await resend.emails.send(emailData);
 
-    console.log(`✅ Email sent successfully! Status: ${response.status}, ID: ${response.data?.id || 'unknown'}`);
-    return { success: true, method: 'email', emailId: response.data?.id };
+    console.log(`✅ Email sent successfully! ID: ${response.id}`);
+    return { success: true, method: 'email', emailId: response.id };
 
   } catch (error) {
     console.error('❌ Email sending failed:', error.message);
@@ -120,10 +111,10 @@ Network: Algorand ${networkName}`,
     // Don't fail the entire transaction if notification fails
     return { 
       success: false, 
-      error: `Email API error (${error.response?.status || 'network'}): ${error.response?.data?.message || error.message}`, 
+      error: `Email API error: ${error.message}`, 
       method: 'email' 
     };
   }
 }
 
-export { isValidPicaConfig };
+export { isValidResendConfig as isValidPicaConfig };
