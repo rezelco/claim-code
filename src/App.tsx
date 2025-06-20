@@ -896,7 +896,15 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
+      {/* Dynamic overlay with radial gradients for depth */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-100/30 via-transparent to-purple-100/20"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-radial from-indigo-200/20 to-transparent rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-gradient-radial from-purple-200/15 to-transparent rounded-full blur-3xl"></div>
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-radial from-blue-100/10 to-transparent rounded-full blur-3xl"></div>
+      
+      {/* Content wrapper with relative positioning */}
+      <div className="relative z-10">
       {/* Timeout Warning Modal */}
       {showTimeoutWarning && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1911,6 +1919,7 @@ function App() {
             </p>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
