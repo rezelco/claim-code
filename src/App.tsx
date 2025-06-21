@@ -276,7 +276,7 @@ function App() {
       return false;
     }
     if (!recipient.trim()) {
-      setError('Please enter recipient email or phone number');
+      setError('Please enter recipient email');
       return false;
     }
     if (!walletConnected) {
@@ -941,7 +941,7 @@ function App() {
 
       {/* Header */}
       <div className="bg-purple-900/90 backdrop-blur-sm border-b border-purple-800/30 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
               <Send className="w-6 h-6 text-white" />
@@ -987,7 +987,7 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
           {/* Main Form Area - Left Side */}
           <div className="lg:col-span-4">
@@ -1201,9 +1201,6 @@ function App() {
                 </div>
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold text-white">Send Cryptocurrency</h2>
-                  <p className="text-purple-100 mt-1">
-                    Send Algos to anyone using their email or phone on {getNetworkConfig().name}
-                  </p>
                 </div>
                 
                 <div className="p-6 space-y-6">
@@ -1261,7 +1258,7 @@ function App() {
                   {/* Recipient Input */}
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">
-                      Recipient (Email or Phone)
+                      Recipient Email
                     </label>
                     <div className="relative">
                       <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400">
@@ -1271,7 +1268,7 @@ function App() {
                         type="text"
                         value={recipient}
                         onChange={(e) => setRecipient(e.target.value)}
-                        placeholder="email@example.com or +1234567890"
+                        placeholder="recipient@example.com"
                         disabled={isLoading}
                         className="w-full pl-10 pr-4 py-3 bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed text-white placeholder-purple-300"
                       />
@@ -1460,9 +1457,6 @@ function App() {
                 </div>
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold text-white">Claim Funds</h2>
-                  <p className="text-purple-100 mt-1">
-                    Enter your claim code to receive Algos on {getNetworkConfig().name}
-                  </p>
                 </div>
                 
                 <div className="p-6 space-y-6">
@@ -1610,10 +1604,7 @@ function App() {
                 </div>
               </div>
               <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
-                <h2 className="text-2xl font-bold text-white">Contracts</h2>
-                <p className="text-purple-100 mt-1">
-                  Manage contracts you've created on {getNetworkConfig().name}
-                </p>
+                <h2 className="text-2xl font-bold text-white">View Contracts</h2>
               </div>
               
               <div className="p-6 space-y-6">
@@ -1621,15 +1612,15 @@ function App() {
                 {!showContracts && (
                   <div className="text-center">
                     <button
-                      onClick={() => {
+                      onClick={walletConnected ? () => {
                         setShowContracts(true);
                         loadWalletContracts();
-                      }}
-                      disabled={!walletConnected || contractsLoading}
-                      className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed shadow-lg"
+                      } : handleConnectWallet}
+                      disabled={contractsLoading}
+                      className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                     >
-                      <List className="w-5 h-5" />
-                      <span>Load Contracts</span>
+                      {walletConnected ? <List className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                      <span>{walletConnected ? 'Load Contracts' : 'Connect'}</span>
                     </button>
                     <p className="text-purple-200 text-sm mt-2">
                       View and manage all contracts you've created
@@ -1890,9 +1881,6 @@ function App() {
                 </div>
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold text-white">Manage Contracts</h2>
-                  <p className="text-purple-100 mt-1">
-                    Refund unclaimed funds from your contracts on {getNetworkConfig().name}
-                  </p>
                 </div>
                 
                 <div className="p-6 space-y-6">
