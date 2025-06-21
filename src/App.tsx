@@ -1025,50 +1025,6 @@ function App() {
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div className="mb-6">
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={() => handleTabChange('send')}
-              className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
-                activeTab === 'send'
-                  ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
-                  : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Send className="w-4 h-4" />
-                <span>Send Money</span>
-              </div>
-            </button>
-            <button
-              onClick={() => handleTabChange('claim')}
-              className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
-                activeTab === 'claim'
-                  ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
-                  : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Download className="w-4 h-4" />
-                <span>Claim Funds</span>
-              </div>
-            </button>
-            <button
-              onClick={() => handleTabChange('refund')}
-              className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
-                activeTab === 'refund'
-                  ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
-                  : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <RefreshCw className="w-4 h-4" />
-                <span>Manage Contracts</span>
-              </div>
-            </button>
-          </div>
-        </div>
 
         {/* Send Money Tab */}
         {activeTab === 'send' && (
@@ -1199,8 +1155,52 @@ function App() {
             {/* Send Form */}
             {step !== 'complete' && (
               <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+                {/* Tab Navigation */}
+                <div className="px-6 pt-6 pb-4">
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => handleTabChange('send')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'send'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Send className="w-4 h-4" />
+                        <span>Send</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('claim')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'claim'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Download className="w-4 h-4" />
+                        <span>Claim</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('refund')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'refund'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Your Contracts</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
-                  <h2 className="text-2xl font-bold text-white">Send Money</h2>
+                  <h2 className="text-2xl font-bold text-white">Send Cryptocurrency</h2>
                   <p className="text-purple-100 mt-1">
                     Send Algos to anyone using their email or phone on {getNetworkConfig().name}
                   </p>
@@ -1414,6 +1414,50 @@ function App() {
             {/* Claim Form */}
             {claimStep !== 'complete' && (
               <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+                {/* Tab Navigation */}
+                <div className="px-6 pt-6 pb-4">
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => handleTabChange('send')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'send'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Send className="w-4 h-4" />
+                        <span>Send</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('claim')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'claim'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Download className="w-4 h-4" />
+                        <span>Claim</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('refund')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'refund'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Your Contracts</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold text-white">Claim Funds</h2>
                   <p className="text-purple-100 mt-1">
@@ -1533,6 +1577,50 @@ function App() {
           <>
             {/* Contract Management Section */}
             <div className="mb-8 bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+              {/* Tab Navigation */}
+              <div className="px-6 pt-6 pb-4">
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={() => handleTabChange('send')}
+                    className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      activeTab === 'send'
+                        ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                        : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Send className="w-4 h-4" />
+                      <span>Send</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleTabChange('claim')}
+                    className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      activeTab === 'claim'
+                        ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                        : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Download className="w-4 h-4" />
+                      <span>Claim</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleTabChange('refund')}
+                    className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      activeTab === 'refund'
+                        ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                        : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Your Contracts</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
               <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                 <h2 className="text-2xl font-bold text-white">My Contracts</h2>
                 <p className="text-purple-100 mt-1">
@@ -1768,6 +1856,50 @@ function App() {
             {/* Refund Form */}
             {refundStep !== 'complete' && (
               <div data-refund-form className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+                {/* Tab Navigation */}
+                <div className="px-6 pt-6 pb-4">
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => handleTabChange('send')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'send'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Send className="w-4 h-4" />
+                        <span>Send</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('claim')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'claim'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Download className="w-4 h-4" />
+                        <span>Claim</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('refund')}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                        activeTab === 'refund'
+                          ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
+                          : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Your Contracts</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold text-white">Manage Contracts</h2>
                   <p className="text-purple-100 mt-1">
