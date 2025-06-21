@@ -896,12 +896,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
-      {/* Dynamic overlay with radial gradients for depth */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-100/30 via-transparent to-purple-100/20"></div>
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-radial from-indigo-200/20 to-transparent rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-gradient-radial from-purple-200/15 to-transparent rounded-full blur-3xl"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-radial from-blue-100/10 to-transparent rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-800 via-purple-900 to-purple-950 relative overflow-hidden">
       
       {/* Content wrapper with relative positioning */}
       <div className="relative z-10">
@@ -945,15 +940,15 @@ function App() {
       )}
 
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-purple-900/90 backdrop-blur-sm border-b border-purple-800/30 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
               <Send className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">RandCash</h1>
-              <p className="text-sm text-gray-600">Send money with Algorand</p>
+              <h1 className="text-xl font-bold text-white">RandCash</h1>
+              <p className="text-sm text-purple-100">Send crypto with claim codes</p>
             </div>
           </div>
           
@@ -967,12 +962,12 @@ function App() {
             })() ? (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">Pera Wallet</p>
-                  <p className="text-xs text-gray-600">{connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}</p>
+                  <p className="text-sm font-medium text-white">Pera Wallet</p>
+                  <p className="text-xs text-purple-200">{connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}</p>
                 </div>
                 <button
                   onClick={handleDisconnectWallet}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 bg-purple-500/50 hover:bg-purple-500/70 text-white rounded-lg font-medium transition-colors"
                 >
                   Disconnect
                 </button>
@@ -981,10 +976,10 @@ function App() {
               <button
                 onClick={handleConnectWallet}
                 disabled={isLoading || claimLoading}
-                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-400 disabled:to-indigo-400 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:transform-none"
+                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:transform-none shadow-lg"
               >
                 <Wallet className="w-4 h-4" />
-                <span>Connect Pera Wallet</span>
+                <span>Connect Wallet</span>
               </button>
             )}
           </div>
@@ -1015,11 +1010,11 @@ function App() {
 
         {/* MainNet Warning */}
         {isMainNet() && (
-          <div className="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start space-x-3">
-            <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+          <div className="mb-6 bg-orange-900/30 border border-orange-600/50 rounded-xl p-4 flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-orange-300 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-orange-800 font-medium">MainNet Warning</h3>
-              <p className="text-orange-700 text-sm mt-1">
+              <h3 className="text-orange-200 font-medium">MainNet Warning</h3>
+              <p className="text-orange-100 text-sm mt-1">
                 You are using the live Algorand MainNet. Real ALGO will be used for transactions. 
                 Maximum amount is limited to 10 ALGO for safety.
               </p>
@@ -1029,48 +1024,46 @@ function App() {
 
         {/* Tab Navigation */}
         <div className="mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1">
-            <div className="flex">
-              <button
-                onClick={() => handleTabChange('send')}
-                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-                  activeTab === 'send'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <Send className="w-4 h-4" />
-                  <span>Send Funds</span>
-                </div>
-              </button>
-              <button
-                onClick={() => handleTabChange('claim')}
-                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-                  activeTab === 'claim'
-                    ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <Download className="w-4 h-4" />
-                  <span>Claim Funds</span>
-                </div>
-              </button>
-              <button
-                onClick={() => handleTabChange('refund')}
-                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-                  activeTab === 'refund'
-                    ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Refund Funds</span>
-                </div>
-              </button>
-            </div>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={() => handleTabChange('send')}
+              className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                activeTab === 'send'
+                  ? 'bg-white text-purple-700 shadow-xl transform scale-105'
+                  : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Send className="w-4 h-4" />
+                <span>Send Money</span>
+              </div>
+            </button>
+            <button
+              onClick={() => handleTabChange('claim')}
+              className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                activeTab === 'claim'
+                  ? 'bg-white text-purple-700 shadow-xl transform scale-105'
+                  : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Download className="w-4 h-4" />
+                <span>Claim Funds</span>
+              </div>
+            </button>
+            <button
+              onClick={() => handleTabChange('refund')}
+              className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                activeTab === 'refund'
+                  ? 'bg-white text-purple-700 shadow-xl transform scale-105'
+                  : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <RefreshCw className="w-4 h-4" />
+                <span>Manage Contracts</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -1145,16 +1138,16 @@ function App() {
                   )}
 
                   {/* Transaction Details */}
-                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                    <h4 className="font-medium text-gray-900 text-sm">Transaction Details</h4>
+                  <div className="bg-purple-800/20 rounded-xl p-4 space-y-3">
+                    <h4 className="font-medium text-white text-sm">Transaction Details</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Contract Creation:</span>
+                        <span className="text-purple-200">Contract Creation:</span>
                         <a
                           href={getExplorerUrl(result.transactionId)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                          className="text-purple-300 hover:text-purple-100 flex items-center space-x-1"
                         >
                           <span className="font-mono">{result.transactionId.slice(0, 8)}...{result.transactionId.slice(-6)}</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1162,12 +1155,12 @@ function App() {
                       </div>
                       {result.fundingTransactionId && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Contract Funding:</span>
+                          <span className="text-purple-200">Contract Funding:</span>
                           <a
                             href={getExplorerUrl(result.fundingTransactionId)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                            className="text-purple-300 hover:text-purple-100 flex items-center space-x-1"
                           >
                             <span className="font-mono">{result.fundingTransactionId.slice(0, 8)}...{result.fundingTransactionId.slice(-6)}</span>
                             <ExternalLink className="w-3 h-3" />
@@ -1181,7 +1174,7 @@ function App() {
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       onClick={handleSendAnother}
-                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2 shadow-lg"
                     >
                       <Send className="w-5 h-5" />
                       <span>Send Another Payment</span>
@@ -1190,7 +1183,7 @@ function App() {
                       href={getExplorerUrl(result.transactionId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-purple-700/30 hover:bg-purple-600/40 text-purple-100 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
                     >
                       <ExternalLink className="w-5 h-5" />
                       <span>View Contract</span>
@@ -1202,10 +1195,10 @@ function App() {
 
             {/* Send Form */}
             {step !== 'complete' && (
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-6">
-                  <h2 className="text-2xl font-bold text-white">Send Funds</h2>
-                  <p className="text-blue-100 mt-1">
+              <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
+                  <h2 className="text-2xl font-bold text-white">Send Money</h2>
+                  <p className="text-purple-100 mt-1">
                     Send Algos to anyone using their email or phone on {getNetworkConfig().name}
                   </p>
                 </div>
@@ -1228,7 +1221,7 @@ function App() {
 
                   {/* Amount Input */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-white mb-2">
                       Amount (ALGO)
                     </label>
                     <div className="relative">
@@ -1238,43 +1231,37 @@ function App() {
                         onChange={(e) => setAmount(e.target.value)}
                         placeholder="0.1"
                         disabled={isLoading}
-                        className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-3 text-lg bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed text-white placeholder-purple-300"
                         step="0.001"
                         min="0.1"
                         max={isMainNet() ? "10" : undefined}
                       />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-300 font-medium">
                         ALGO
                       </div>
                     </div>
-                    <div className="mt-2 text-sm text-gray-600">
+                    <div className="mt-2 text-sm text-purple-100">
                       <div className="flex items-center space-x-1">
-                        <Info className="w-4 h-4 text-blue-500" />
+                        <Info className="w-4 h-4 text-purple-300" />
                         <span>
-                          Minimum 0.1 ALGO. Total cost: ~{amount ? (parseFloat(amount) + 0.487).toFixed(3) : '0.587'} ALGO 
-                          (includes smart contract deployment for secure, refundable transfers)
+                          Minimum 0.1 ALGO required
                         </span>
                       </div>
                     </div>
                     {isMainNet() && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-purple-200 mt-1">
                         Maximum: 10 ALGO for safety on MainNet
                       </p>
                     )}
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-                      <p className="text-yellow-800 text-xs">
-                        <strong>💡 Balance Required:</strong> You need at least ~{amount ? (parseFloat(amount) + 0.487).toFixed(3) : '0.587'} ALGO in your wallet to deploy the smart contract.
-                      </p>
-                    </div>
                   </div>
 
                   {/* Recipient Input */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-white mb-2">
                       Recipient (Email or Phone)
                     </label>
                     <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400">
                         {getRecipientIcon()}
                       </div>
                       <input
@@ -1283,18 +1270,18 @@ function App() {
                         onChange={(e) => setRecipient(e.target.value)}
                         placeholder="email@example.com or +1234567890"
                         disabled={isLoading}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        className="w-full pl-10 pr-4 py-3 bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed text-white placeholder-purple-300"
                       />
                     </div>
                   </div>
 
                   {/* Message Input */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-white mb-2">
                       Message (Optional)
                     </label>
                     <div className="relative">
-                      <div className="absolute left-3 top-3 text-gray-400">
+                      <div className="absolute left-3 top-3 text-purple-400">
                         <MessageSquare className="w-4 h-4" />
                       </div>
                       <textarea
@@ -1303,7 +1290,7 @@ function App() {
                         placeholder="Add a personal message..."
                         rows={3}
                         disabled={isLoading}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        className="w-full pl-10 pr-4 py-3 bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 resize-none transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed text-white placeholder-purple-300"
                       />
                     </div>
                   </div>
@@ -1312,7 +1299,7 @@ function App() {
                   <button
                     onClick={handleSend}
                     disabled={isLoading || !walletConnected || step !== 'form'}
-                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                   >
                     {isLoading ? (
                       <>
@@ -1365,33 +1352,33 @@ function App() {
                 
                 <div className="p-6 space-y-4">
                   {/* Transaction Details */}
-                  <div className="bg-white rounded-xl p-5 border border-purple-200 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Claim Details</h3>
+                  <div className="bg-purple-800/20 rounded-xl p-5 border border-purple-600/30 shadow-sm">
+                    <h3 className="text-lg font-semibold text-white mb-4">Claim Details</h3>
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Amount Received</p>
-                        <p className="text-2xl font-bold text-gray-900">{claimResult.amount} ALGO</p>
+                        <p className="text-sm text-purple-200 mb-1">Amount Received</p>
+                        <p className="text-2xl font-bold text-white">{claimResult.amount} ALGO</p>
                       </div>
                       {claimResult.message && (
                         <div>
-                          <p className="text-sm text-gray-600 mb-1">Message</p>
-                          <p className="text-gray-900 italic">"{claimResult.message}"</p>
+                          <p className="text-sm text-purple-200 mb-1">Message</p>
+                          <p className="text-white italic">"{claimResult.message}"</p>
                         </div>
                       )}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm text-gray-600">Transaction ID</p>
+                          <p className="text-sm text-purple-200">Transaction ID</p>
                           <a
                             href={getExplorerUrl(claimResult.transactionId)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-800"
+                            className="flex items-center space-x-1 text-xs text-purple-300 hover:text-purple-100"
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>Explorer</span>
                           </a>
                         </div>
-                        <p className="font-mono text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded border break-all">
+                        <p className="font-mono text-sm text-purple-100 bg-purple-900/30 px-3 py-2 rounded border border-purple-600/30 break-all">
                           {claimResult.transactionId}
                         </p>
                       </div>
@@ -1402,7 +1389,7 @@ function App() {
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       onClick={handleClaimAnother}
-                      className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2 shadow-lg"
                     >
                       <Download className="w-5 h-5" />
                       <span>Claim Another</span>
@@ -1411,7 +1398,7 @@ function App() {
                       href={getExplorerUrl(claimResult.transactionId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-purple-700/30 hover:bg-purple-600/40 text-purple-100 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
                     >
                       <ExternalLink className="w-5 h-5" />
                       <span>View on Explorer</span>
@@ -1423,8 +1410,8 @@ function App() {
 
             {/* Claim Form */}
             {claimStep !== 'complete' && (
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-6">
+              <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold text-white">Claim Funds</h2>
                   <p className="text-purple-100 mt-1">
                     Enter your claim code to receive Algos on {getNetworkConfig().name}
@@ -1444,7 +1431,7 @@ function App() {
 
                   {/* Combined Claim Code Input */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-white mb-2">
                       Claim Code
                     </label>
                     <div className="relative">
@@ -1454,13 +1441,13 @@ function App() {
                         onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
                         placeholder="e.g., 741503729-A1B2C3D4E5F6G7H8"
                         disabled={claimLoading}
-                        className="w-full px-4 py-3 pr-12 text-lg font-mono border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed tracking-wider"
+                        className="w-full px-4 py-3 pr-12 text-lg font-mono bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed tracking-wider text-white placeholder-purple-300"
                       />
                       <button
                         type="button"
                         onClick={() => setShowClaimCode(!showClaimCode)}
                         disabled={claimLoading}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-400 hover:text-purple-300 disabled:cursor-not-allowed transition-colors"
                         title={showClaimCode ? "Hide claim code" : "Show claim code"}
                       >
                         {showClaimCode ? (
@@ -1470,7 +1457,7 @@ function App() {
                         )}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-purple-200 mt-1">
                       Enter the claim code you received (includes both app ID and claim code).
                     </p>
                   </div>
@@ -1494,7 +1481,7 @@ function App() {
                   <button
                     onClick={handleClaimFunds}
                     disabled={claimLoading || !walletConnected || claimStep !== 'form'}
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                   >
                     {claimLoading ? (
                       <>
@@ -1527,11 +1514,11 @@ function App() {
 
         {/* Wallet Connection Required Notice */}
         {!walletConnected && !showReconnectPrompt && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
-            <Wallet className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div className="mt-6 bg-blue-900/30 border border-blue-600/50 rounded-xl p-4 flex items-start space-x-3">
+            <Wallet className="w-5 h-5 text-blue-300 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-blue-800 font-medium">Wallet Required</h3>
-              <p className="text-blue-700 text-sm mt-1">
+              <h3 className="text-blue-200 font-medium">Wallet Required</h3>
+              <p className="text-blue-100 text-sm mt-1">
                 Connect your Pera wallet to {activeTab === 'send' ? 'send' : activeTab === 'claim' ? 'claim' : 'refund'} money securely on Algorand {getNetworkConfig().name}.
               </p>
             </div>
@@ -1542,10 +1529,10 @@ function App() {
         {activeTab === 'refund' && (
           <>
             {/* Contract Management Section */}
-            <div className="mb-8 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-6">
+            <div className="mb-8 bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+              <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                 <h2 className="text-2xl font-bold text-white">My Contracts</h2>
-                <p className="text-indigo-100 mt-1">
+                <p className="text-purple-100 mt-1">
                   Manage contracts you've created on {getNetworkConfig().name}
                 </p>
               </div>
@@ -1560,12 +1547,12 @@ function App() {
                         loadWalletContracts();
                       }}
                       disabled={!walletConnected || contractsLoading}
-                      className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed"
+                      className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed shadow-lg"
                     >
                       <List className="w-5 h-5" />
                       <span>Load My Contracts</span>
                     </button>
-                    <p className="text-gray-600 text-sm mt-2">
+                    <p className="text-purple-200 text-sm mt-2">
                       View and manage all contracts you've created
                     </p>
                   </div>
@@ -1605,13 +1592,13 @@ function App() {
                 {showContracts && !contractsLoading && !contractsError && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-white">
                         Your Contracts ({contracts.length})
                       </h3>
                       <button
                         onClick={loadWalletContracts}
                         disabled={contractsLoading}
-                        className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="flex items-center space-x-1 px-3 py-1.5 text-sm text-purple-200 hover:text-white hover:bg-purple-700/30 rounded-lg transition-colors"
                       >
                         <RefreshCw className="w-4 h-4" />
                         <span>Refresh</span>
@@ -1619,8 +1606,8 @@ function App() {
                     </div>
 
                     {contracts.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <List className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <div className="text-center py-8 text-purple-200">
+                        <List className="w-12 h-12 mx-auto mb-3 text-purple-400" />
                         <p>No contracts found</p>
                         <p className="text-sm">Contracts you create will appear here</p>
                       </div>
@@ -1629,12 +1616,12 @@ function App() {
                         {contracts.map((contract) => (
                           <div
                             key={contract.applicationId}
-                            className="bg-gray-50 rounded-xl p-4 border border-gray-200"
+                            className="bg-purple-800/20 rounded-xl p-4 border border-purple-600/30"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1 space-y-2">
                                 <div className="flex items-center space-x-3">
-                                  <span className="font-mono text-lg font-bold text-gray-900">
+                                  <span className="font-mono text-lg font-bold text-white">
                                     App ID: {contract.applicationId}
                                   </span>
                                   <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadgeColor(contract.status)}`}>
@@ -1644,17 +1631,17 @@ function App() {
                                 
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                   <div>
-                                    <span className="text-gray-600">Amount: </span>
-                                    <span className="font-medium">{contract.amount} ALGO</span>
+                                    <span className="text-purple-200">Amount: </span>
+                                    <span className="font-medium text-white">{contract.amount} ALGO</span>
                                   </div>
                                   <div>
-                                    <span className="text-gray-600">Balance: </span>
-                                    <span className="font-medium">{contract.balance} ALGO</span>
+                                    <span className="text-purple-200">Balance: </span>
+                                    <span className="font-medium text-white">{contract.balance} ALGO</span>
                                   </div>
                                   {contract.createdDate && (
                                     <div className="col-span-2">
-                                      <span className="text-gray-600">Created: </span>
-                                      <span className="font-medium">
+                                      <span className="text-purple-200">Created: </span>
+                                      <span className="font-medium text-white">
                                         {new Date(contract.createdDate).toLocaleString()}
                                       </span>
                                     </div>
@@ -1735,16 +1722,16 @@ function App() {
                 </div>
                 
                 <div className="p-6 space-y-4">
-                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                    <h4 className="font-medium text-gray-900 text-sm">Transaction Details</h4>
+                  <div className="bg-purple-800/20 rounded-xl p-4 space-y-3">
+                    <h4 className="font-medium text-white text-sm">Transaction Details</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Refund Transaction:</span>
+                        <span className="text-purple-200">Refund Transaction:</span>
                         <a
                           href={getExplorerUrl(refundResult.transactionId)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                          className="text-purple-300 hover:text-purple-100 flex items-center space-x-1"
                         >
                           <span className="font-mono">{refundResult.transactionId.slice(0, 8)}...{refundResult.transactionId.slice(-6)}</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1756,7 +1743,7 @@ function App() {
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       onClick={handleRefundAnother}
-                      className="flex-1 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2 shadow-lg"
                     >
                       <RefreshCw className="w-5 h-5" />
                       <span>Refund Another Contract</span>
@@ -1765,7 +1752,7 @@ function App() {
                       href={getExplorerUrl(refundResult.transactionId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
+                      className="flex-1 py-3 bg-purple-700/30 hover:bg-purple-600/40 text-purple-100 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
                     >
                       <ExternalLink className="w-5 h-5" />
                       <span>View Transaction</span>
@@ -1777,10 +1764,10 @@ function App() {
 
             {/* Refund Form */}
             {refundStep !== 'complete' && (
-              <div data-refund-form className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-red-600 to-rose-600 px-6 py-6">
-                  <h2 className="text-2xl font-bold text-white">Refund Funds</h2>
-                  <p className="text-red-100 mt-1">
+              <div data-refund-form className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
+                  <h2 className="text-2xl font-bold text-white">Manage Contracts</h2>
+                  <p className="text-purple-100 mt-1">
                     Refund unclaimed funds from your contracts on {getNetworkConfig().name}
                   </p>
                 </div>
@@ -1821,7 +1808,7 @@ function App() {
 
                   {/* Application ID Input */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-white mb-2">
                       Application ID
                     </label>
                     <input
@@ -1829,10 +1816,10 @@ function App() {
                       value={refundApplicationId}
                       onChange={(e) => setRefundApplicationId(e.target.value)}
                       placeholder="Enter the Application ID of the contract to refund"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors font-mono text-lg"
+                      className="w-full px-4 py-3 bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed font-mono text-lg text-white placeholder-purple-300"
                       disabled={refundLoading}
                     />
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-sm text-purple-200 mt-2">
                       This should be the Application ID from when you originally sent the funds.
                     </p>
                   </div>
@@ -1872,7 +1859,7 @@ function App() {
                   <button
                     onClick={handleRefund}
                     disabled={!walletConnected || refundLoading || !refundApplicationId.trim()}
-                    className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                   >
                     {refundLoading ? (
                       <>
@@ -1893,13 +1880,13 @@ function App() {
         )}
 
         {/* Network Notice */}
-        <div className={`mt-6 ${isTestNet() ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50 border-orange-200'} border rounded-xl p-4 flex items-start space-x-3`}>
-          <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-500' : 'text-orange-500'} flex-shrink-0 mt-0.5`} />
+        <div className={`mt-6 ${isTestNet() ? 'bg-yellow-900/30 border-yellow-600/50' : 'bg-orange-900/30 border-orange-600/50'} border rounded-xl p-4 flex items-start space-x-3`}>
+          <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-300' : 'text-orange-300'} flex-shrink-0 mt-0.5`} />
           <div>
-            <h3 className={`${isTestNet() ? 'text-yellow-800' : 'text-orange-800'} font-medium`}>
+            <h3 className={`${isTestNet() ? 'text-yellow-200' : 'text-orange-200'} font-medium`}>
               {getNetworkConfig().name} Environment
             </h3>
-            <p className={`${isTestNet() ? 'text-yellow-700' : 'text-orange-700'} text-sm mt-1`}>
+            <p className={`${isTestNet() ? 'text-yellow-100' : 'text-orange-100'} text-sm mt-1`}>
               {isTestNet() ? (
                 <>
                   This app is running on Algorand TestNet. Use TestNet Algos for testing. 
