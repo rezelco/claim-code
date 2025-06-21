@@ -1,13 +1,44 @@
 # Todo List
 
-## Current Task: Change All Text to White for Better Visibility
+## Current Task: Redesign to Match Dark Green Screenshot
 
-### Typography fix: Update all black/dark text to white for dark purple background
+### New Screenshot Analysis - Major Changes Needed:
 
-**1. Background Changes:** [COMPLETED ✅]
-- [x] Replace complex radial gradients with clean purple gradient background
-- [x] Use solid purple gradient instead of multiple overlapping elements
-- [x] Make background much smoother and cleaner
+**1. Layout Restructuring:** [APPROVED - IN PROGRESS]
+- [ ] Create two-column layout (main form left, "How it Works" sidebar right)
+- [ ] Make form area more compact and focused
+- [ ] Add "How it Works" informational sidebar
+
+**2. Form Design Changes:**
+- [ ] Simplify form to single card design (no separate header)
+- [ ] Update form title to "Send Cryptocurrency" 
+- [ ] Make inputs more compact and streamlined
+- [ ] Remove extra spacing and simplify layout
+
+**3. Tab Design Updates:**
+- [ ] Update tab styling to match rounded pill design
+- [ ] Make Send tab more prominent with teal accent border
+- [ ] Simplify tab layout and spacing
+
+**4. Color Scheme Adjustments:**
+- [ ] Keep purple background but add teal accent colors
+- [ ] Use teal for active tab borders and highlights
+- [ ] Maintain purple glass effects but add teal accents
+
+**5. Sidebar Addition:**
+- [ ] Create "How it Works" sidebar with numbered steps
+- [ ] Add step-by-step process explanation
+- [ ] Style with glass effect to match main content
+
+**6. Content Simplification:**
+- [ ] Remove extra warnings and notices for cleaner look
+- [ ] Streamline form labels and descriptions
+- [ ] Focus on essential information only
+
+**7. Typography Refinements:**
+- [ ] Adjust heading hierarchy to match screenshot
+- [ ] Ensure proper text sizing and spacing
+- [ ] Maintain white text but optimize readability
 
 **2. Header Styling:** [COMPLETED ✅]
 - [x] Change header background to solid purple

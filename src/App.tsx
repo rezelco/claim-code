@@ -987,7 +987,10 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Form Area - Left Side */}
+          <div className="lg:col-span-2">
         {/* Reconnection Prompt */}
         {showReconnectPrompt && (
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
@@ -1904,6 +1907,58 @@ function App() {
                 'This app is running on Algorand MainNet. Real ALGO will be used for all transactions. Please be careful and double-check all details before sending.'
               )}
             </p>
+          </div>
+        </div>
+          </div>
+          
+          {/* How it Works Sidebar - Right Side */}
+          <div className="lg:col-span-1">
+            <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden sticky top-24">
+              <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
+                <h2 className="text-2xl font-bold text-white">How it Works</h2>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {/* Step 1 */}
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-sm">1</span>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold mb-2">Send Funds</h3>
+                    <p className="text-purple-100 text-sm">
+                      Enter amount and recipient email to create a secure claim code
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Step 2 */}
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-sm">2</span>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold mb-2">Email Notification</h3>
+                    <p className="text-purple-100 text-sm">
+                      User receives email with claim code
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Step 3 */}
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold text-sm">3</span>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold mb-2">Claim Funds</h3>
+                    <p className="text-purple-100 text-sm">
+                      Use claim code to receive funds securely
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
