@@ -1559,18 +1559,6 @@ function App() {
           </>
         )}
 
-        {/* Wallet Connection Required Notice */}
-        {!walletConnected && !showReconnectPrompt && (
-          <div className="mt-6 bg-blue-900/30 border border-blue-600/50 rounded-xl p-4 flex items-start space-x-3">
-            <Wallet className="w-5 h-5 text-blue-300 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-blue-200 font-medium">Wallet Required</h3>
-              <p className="text-blue-100 text-sm mt-1">
-                Connect your Pera wallet to {activeTab === 'send' ? 'send' : activeTab === 'claim' ? 'claim' : 'refund'} money securely on Algorand {getNetworkConfig().name}.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Refund Money Tab */}
         {activeTab === 'refund' && (
