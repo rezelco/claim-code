@@ -979,7 +979,7 @@ function App() {
                 className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:transform-none shadow-lg"
               >
                 <Wallet className="w-4 h-4" />
-                <span>Connect Wallet</span>
+                <span>Connect</span>
               </button>
             )}
           </div>
@@ -988,9 +988,9 @@ function App() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
           {/* Main Form Area - Left Side */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-4">
         {/* Reconnection Prompt */}
         {showReconnectPrompt && (
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
@@ -1300,8 +1300,8 @@ function App() {
 
                   {/* Send Button */}
                   <button
-                    onClick={handleSend}
-                    disabled={isLoading || !walletConnected || step !== 'form'}
+                    onClick={walletConnected ? handleSend : handleConnectWallet}
+                    disabled={isLoading || (walletConnected && step !== 'form')}
                     className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                   >
                     {isLoading ? (
@@ -1311,8 +1311,8 @@ function App() {
                       </>
                     ) : (
                       <>
-                        <Send className="w-5 h-5" />
-                        <span>Send Funds</span>
+                        {walletConnected ? <Send className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                        <span>{walletConnected ? 'Send Funds' : 'Connect'}</span>
                       </>
                     )}
                   </button>
@@ -1526,8 +1526,8 @@ function App() {
 
                   {/* Claim Button */}
                   <button
-                    onClick={handleClaimFunds}
-                    disabled={claimLoading || !walletConnected || claimStep !== 'form'}
+                    onClick={walletConnected ? handleClaimFunds : handleConnectWallet}
+                    disabled={claimLoading || (walletConnected && claimStep !== 'form')}
                     className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                   >
                     {claimLoading ? (
@@ -1537,8 +1537,8 @@ function App() {
                       </>
                     ) : (
                       <>
-                        <Download className="w-5 h-5" />
-                        <span>Claim Funds</span>
+                        {walletConnected ? <Download className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                        <span>{walletConnected ? 'Claim Funds' : 'Connect'}</span>
                       </>
                     )}
                   </button>
@@ -1980,8 +1980,8 @@ function App() {
 
                   {/* Submit Button */}
                   <button
-                    onClick={handleRefund}
-                    disabled={!walletConnected || refundLoading || !refundApplicationId.trim()}
+                    onClick={walletConnected ? handleRefund : handleConnectWallet}
+                    disabled={refundLoading || (walletConnected && !refundApplicationId.trim())}
                     className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
                   >
                     {refundLoading ? (
@@ -1991,8 +1991,8 @@ function App() {
                       </>
                     ) : (
                       <>
-                        <RefreshCw className="w-5 h-5" />
-                        <span>Refund Funds</span>
+                        {walletConnected ? <RefreshCw className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                        <span>{walletConnected ? 'Refund Funds' : 'Connect'}</span>
                       </>
                     )}
                   </button>
@@ -2032,7 +2032,7 @@ function App() {
           </div>
           
           {/* How it Works Sidebar - Right Side */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-2">
             <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden sticky top-24">
               <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                 <h2 className="text-2xl font-bold text-white">How it Works</h2>
