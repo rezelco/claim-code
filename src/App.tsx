@@ -1032,7 +1032,7 @@ function App() {
               onClick={() => handleTabChange('send')}
               className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
                 activeTab === 'send'
-                  ? 'bg-white text-purple-700 shadow-xl transform scale-105'
+                  ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
                   : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
               }`}
             >
@@ -1045,7 +1045,7 @@ function App() {
               onClick={() => handleTabChange('claim')}
               className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
                 activeTab === 'claim'
-                  ? 'bg-white text-purple-700 shadow-xl transform scale-105'
+                  ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
                   : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
               }`}
             >
@@ -1058,7 +1058,7 @@ function App() {
               onClick={() => handleTabChange('refund')}
               className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
                 activeTab === 'refund'
-                  ? 'bg-white text-purple-700 shadow-xl transform scale-105'
+                  ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
                   : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
               }`}
             >
