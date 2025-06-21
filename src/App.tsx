@@ -1047,6 +1047,7 @@ function App() {
                 </div>
                 
                 <div className="p-6 space-y-4">
+
                   {/* Combined Claim Code */}
                   {result.applicationId && (
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
