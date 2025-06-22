@@ -707,7 +707,86 @@ function App() {
     }
   };
 
+  const handleRefundWithId = async (applicationId: number) => {
+    console.log('handleRefundWithId called with ID:', applicationId);
+    setRefundError('');
+    setRefundResult(null);
+
+    if (!walletConnected) {
+      setRefundError('Please connect your wallet first');
+      return;
+    }
+
+    if (!connectedAccount) {
+      setRefundError('No wallet account connected. Please connect your wallet first.');
+      return;
+    }
+
+    setRefundLoading(true);
+    setRefundStep('signing');
+
+    try {
+      console.log('Creating refund transaction for Application ID:', applicationId);
+      
+      // Get fresh account from wallet service
+      const currentAccount = await getConnectedAccount();
+      
+      if (!currentAccount) {
+        throw new Error('Unable to get connected account from wallet');
+      }
+      
+      // Step 1: Create refund transaction
+      const refundResponse = await refundFunds({
+        applicationId: applicationId,
+        walletAddress: currentAccount
+      });
+
+      // Step 2: Sign the refund transaction
+      console.log('Signing refund transaction...');
+      const signedTxn = await signTransaction(refundResponse.transactionToSign);
+      
+      // Convert signed transaction to base64
+      const signedTxnB64 = Buffer.from(signedTxn).toString('base64');
+      
+      setRefundStep('submitting');
+      console.log('Submitting refund transaction...');
+      
+      // Step 3: Submit the signed transaction  
+      const submitResponse = await submitTransaction({
+        signedTransaction: signedTxnB64
+      });
+
+      console.log('✅ Refund transaction confirmed:', submitResponse.transactionId);
+
+      setRefundResult({
+        success: true,
+        transactionId: submitResponse.transactionId,
+        amount: 0, // We'll need to get this from contract state if needed
+        message: 'Funds refunded successfully!'
+      });
+      
+      setRefundStep('complete');
+      
+      // Show success toast
+      showToast('Contract refunded successfully');
+      
+      // Reload contracts to reflect changes
+      if (showContracts) {
+        loadWalletContracts();
+      }
+      
+      // Reset form
+      setRefundApplicationId('');
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : 'Failed to refund funds');
+      setRefundStep('form');
+    } finally {
+      setRefundLoading(false);
+    }
+  };
+
   const handleRefund = async () => {
+    console.log('handleRefund called');
     setRefundError('');
     setRefundResult(null);
 
@@ -1015,6 +1094,7 @@ function App() {
 
   // Show confirmation dialog
   const showConfirmDialog = (type: 'refund' | 'delete', applicationId: number, amount?: number) => {
+    console.log('showConfirmDialog called:', type, applicationId, amount);
     if (type === 'refund') {
       setConfirmDialog({
         isOpen: true,
@@ -1024,9 +1104,10 @@ function App() {
         applicationId,
         amount,
         onConfirm: () => {
+          console.log('Confirm dialog onConfirm called for refund');
           setConfirmDialog(prev => ({ ...prev, isOpen: false }));
           setRefundApplicationId(applicationId.toString());
-          handleRefund();
+          handleRefundWithId(applicationId);
         }
       });
     } else if (type === 'delete') {
@@ -1046,12 +1127,16 @@ function App() {
 
   // Handle inline refund from contract card
   const handleInlineRefund = async (applicationId: number, amount: number) => {
+    console.log('handleInlineRefund called:', applicationId, amount, 'walletConnected:', walletConnected);
     if (!walletConnected || !connectedAccount) {
       await handleConnectWallet();
       return;
     }
 
-    showConfirmDialog('refund', applicationId, amount);
+    // Add small delay to ensure state is ready
+    setTimeout(() => {
+      showConfirmDialog('refund', applicationId, amount);
+    }, 50);
   };
 
   // Handle inline delete from contract card
@@ -2160,47 +2245,64 @@ function App() {
 
             {/* Refund Success Result */}
             {refundResult && refundStep === 'complete' && (
-              <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl overflow-hidden shadow-lg">
-                <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-6">
+              <div className="mb-8 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-6">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                       <CheckCircle className="w-7 h-7 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-white">Refund Successful!</h2>
-                      <p className="text-green-100 mt-1">
-                        Your funds have been refunded from contract {refundApplicationId}
+                      <h2 className="text-2xl font-bold text-white">🎉 Refund Successful! Funds returned to your wallet.</h2>
+                      <p className="text-purple-100 mt-1">
+                        Contract #{refundApplicationId} refunded on {getNetworkConfig().name}
                       </p>
                     </div>
                   </div>
                 </div>
                 
                 <div className="p-6 space-y-4">
-                  <div className="bg-purple-800/20 rounded-xl p-4 space-y-3">
-                    <h4 className="font-medium text-white text-sm">Transaction Details</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-purple-200">Refund Transaction:</span>
-                        <a
-                          href={getExplorerUrl(refundResult.transactionId)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-300 hover:text-purple-100 flex items-center space-x-1"
-                        >
-                          <span className="font-mono">{refundResult.transactionId.slice(0, 8)}...{refundResult.transactionId.slice(-6)}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                  {/* Transaction Details */}
+                  <div className="bg-purple-800/20 rounded-xl p-5 border border-purple-600/30 shadow-sm">
+                    <h3 className="text-lg font-semibold text-white mb-4">Refund Details</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm text-purple-200 mb-1">Amount Refunded</p>
+                        <p className="text-2xl font-bold text-white">Contract #{refundApplicationId}</p>
+                      </div>
+                      {refundResult.message && (
+                        <div>
+                          <p className="text-sm text-purple-200 mb-1">Message</p>
+                          <p className="text-white italic">"{refundResult.message}"</p>
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm text-purple-200">Transaction ID</p>
+                          <a
+                            href={getExplorerUrl(refundResult.transactionId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-1 text-xs text-purple-300 hover:text-purple-100"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Explorer</span>
+                          </a>
+                        </div>
+                        <p className="font-mono text-sm text-purple-100 bg-purple-900/30 px-3 py-2 rounded border border-purple-600/30 break-all">
+                          {refundResult.transactionId}
+                        </p>
                       </div>
                     </div>
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       onClick={handleRefundAnother}
                       className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2 shadow-lg"
                     >
                       <RefreshCw className="w-5 h-5" />
-                      <span>Refund Another Contract</span>
+                      <span>Manage More Contracts</span>
                     </button>
                     <a
                       href={getExplorerUrl(refundResult.transactionId)}
@@ -2209,7 +2311,7 @@ function App() {
                       className="flex-1 py-3 bg-purple-700/30 hover:bg-purple-600/40 text-purple-100 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
                     >
                       <ExternalLink className="w-5 h-5" />
-                      <span>View Transaction</span>
+                      <span>View on Explorer</span>
                     </a>
                   </div>
                 </div>
