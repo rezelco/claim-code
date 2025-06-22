@@ -918,9 +918,33 @@ function App() {
   };
 
   // Time calculation helper
-  const getTimeAgo = (timestamp: number) => {
+  const getTimeAgo = (contract: any) => {
+    // Try to get timestamp from either field
+    let timestamp = contract.createdTimestamp;
+    
+    // If no timestamp, try parsing createdDate
+    if (!timestamp || timestamp <= 0) {
+      if (contract.createdDate) {
+        timestamp = new Date(contract.createdDate).getTime();
+      }
+    }
+    
+    // Still no valid timestamp - provide reasonable fallback
+    if (!timestamp || timestamp <= 0 || isNaN(timestamp)) {
+      // For older contracts without timestamp data, assume they're "some time ago"
+      return 'some time ago';
+    }
+
     const now = Date.now();
-    const diffMs = now - timestamp;
+    // Convert timestamp to milliseconds if it's in seconds (Unix timestamp)
+    const timestampMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+    const diffMs = now - timestampMs;
+    
+    // Handle negative differences (future timestamps)
+    if (diffMs < 0) {
+      return 'just now';
+    }
+
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -957,10 +981,28 @@ function App() {
   };
 
   // Helper function to check if refund is available (5+ minutes after creation)
-  const getRefundAvailability = (createdTimestamp: number) => {
+  const getRefundAvailability = (contract: any) => {
+    // Try to get timestamp from either field
+    let timestamp = contract.createdTimestamp;
+    
+    // If no timestamp, try parsing createdDate
+    if (!timestamp || timestamp <= 0) {
+      if (contract.createdDate) {
+        timestamp = new Date(contract.createdDate).getTime();
+      }
+    }
+    
+    if (!timestamp || timestamp <= 0 || isNaN(timestamp)) {
+      // For older contracts without timestamp data, assume they're old enough to refund
+      // This prevents "refund in 5 min" showing for legacy contracts
+      return { canRefund: true, timeRemaining: 0 };
+    }
+
     const now = Date.now();
+    // Convert timestamp to milliseconds if it's in seconds (Unix timestamp)
+    const timestampMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
     const fiveMinutesMs = 5 * 60 * 1000;
-    const timeSinceCreation = now - createdTimestamp;
+    const timeSinceCreation = now - timestampMs;
     
     if (timeSinceCreation >= fiveMinutesMs) {
       return { canRefund: true, timeRemaining: 0 };
@@ -1892,14 +1934,17 @@ function App() {
                                 >
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1 space-y-2">
-                                      <div className="flex items-center space-x-3">
+                                      <div className="flex items-center justify-between">
                                         <span className="font-mono text-lg font-bold text-white">
                                           💸 {contract.amount} ALGO (+ 0.1 ALGO locked)
+                                        </span>
+                                        <span className="font-mono text-xs text-blue-300 bg-blue-800/30 px-2 py-1 rounded">
+                                          #{contract.applicationId}
                                         </span>
                                       </div>
                                       <div className="flex items-center space-x-3">
                                         <span className="text-blue-200 text-sm">
-                                          Sent {getTimeAgo(contract.createdTimestamp)} • Unclaimed
+                                          Sent {getTimeAgo(contract)} • Unclaimed
                                         </span>
                                       </div>
                                       
@@ -1917,7 +1962,7 @@ function App() {
                                       </a>
 
                                       {(() => {
-                                        const refundStatus = getRefundAvailability(contract.createdTimestamp);
+                                        const refundStatus = getRefundAvailability(contract);
                                         if (refundStatus.canRefund && contract.canRefund) {
                                           return (
                                             <button
@@ -1987,9 +2032,12 @@ function App() {
                                 >
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1 space-y-2">
-                                      <div className="flex items-center space-x-3">
+                                      <div className="flex items-center justify-between">
                                         <span className="font-mono text-lg font-bold text-white">
                                           ↩️ {contract.amount} ALGO refunded
+                                        </span>
+                                        <span className="font-mono text-xs text-gray-300 bg-gray-800/30 px-2 py-1 rounded">
+                                          #{contract.applicationId}
                                         </span>
                                       </div>
                                       <div className="flex items-center space-x-3">
@@ -1999,7 +2047,7 @@ function App() {
                                       </div>
                                       <div className="flex items-center space-x-3">
                                         <span className="text-gray-300 text-sm">
-                                          Sent {getTimeAgo(contract.createdTimestamp)} • Refunded recently
+                                          Sent {getTimeAgo(contract)} • Refunded recently
                                         </span>
                                       </div>
                                     </div>
@@ -2051,9 +2099,12 @@ function App() {
                                 >
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1 space-y-2">
-                                      <div className="flex items-center space-x-3">
+                                      <div className="flex items-center justify-between">
                                         <span className="font-mono text-lg font-bold text-white">
                                           ✓ {contract.amount} ALGO claimed
+                                        </span>
+                                        <span className="font-mono text-xs text-green-300 bg-green-800/30 px-2 py-1 rounded">
+                                          #{contract.applicationId}
                                         </span>
                                       </div>
                                       <div className="flex items-center space-x-3">
@@ -2063,7 +2114,7 @@ function App() {
                                       </div>
                                       <div className="flex items-center space-x-3">
                                         <span className="text-green-300 text-sm">
-                                          Sent {getTimeAgo(contract.createdTimestamp)} • Claimed recently
+                                          Sent {getTimeAgo(contract)} • Claimed recently
                                         </span>
                                       </div>
                                     </div>
