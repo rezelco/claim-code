@@ -625,14 +625,12 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
     
-    if (!recipient || !recipient.trim()) {
-      return res.status(400).json({ error: 'Recipient email is required' });
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(recipient.trim())) {
-      return res.status(400).json({ error: 'Please provide a valid email address' });
+    // Email is now optional - only validate format if provided
+    if (recipient && recipient.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(recipient.trim())) {
+        return res.status(400).json({ error: 'Please provide a valid email address' });
+      }
     }
     
     // Validate sender address using our helper function

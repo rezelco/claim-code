@@ -90,7 +90,7 @@ function App() {
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
-    type: 'refund' | 'delete';
+    type: 'refund' | 'delete' | 'no_email';
     title: string;
     message: string;
     onConfirm: () => void;
@@ -303,10 +303,7 @@ function App() {
       setError('Minimum amount is 0.1 ALGO (required for Algorand account minimum balance)');
       return false;
     }
-    if (!recipient.trim()) {
-      setError('Please enter recipient email');
-      return false;
-    }
+    // Email is now optional - validation removed
     if (!walletConnected) {
       setError('Please connect your wallet first');
       return false;
@@ -378,6 +375,26 @@ function App() {
 
     if (!validateForm()) return;
 
+    // Check if email is empty and show confirmation dialog
+    if (!recipient.trim()) {
+      setConfirmDialog({
+        isOpen: true,
+        type: 'no_email',
+        title: 'No email address provided',
+        message: "The recipient won't receive an email notification. They'll need the claim code through another method. Continue anyway?",
+        onConfirm: () => {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          proceedWithSend();
+        }
+      });
+      return;
+    }
+
+    // If email is provided, proceed normally
+    proceedWithSend();
+  };
+
+  const proceedWithSend = async () => {
     if (!connectedAccount) {
       setError('No wallet account connected. Please connect your wallet first.');
       return;
@@ -1332,15 +1349,15 @@ function App() {
           <>
             {/* Send Success Result */}
             {result && step === 'complete' && (
-              <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl overflow-hidden shadow-lg">
-                <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-6">
+              <div className="mb-8 bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                       <CheckCircle className="w-7 h-7 text-white" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">Money Sent Successfully!</h2>
-                      <p className="text-green-100 mt-1">
+                      <p className="text-purple-100 mt-1">
                         {result.amount} ALGO sent to {result.recipient} on {getNetworkConfig().name}
                       </p>
                     </div>
@@ -1351,9 +1368,9 @@ function App() {
 
                   {/* Combined Claim Code */}
                   {result.applicationId && (
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
+                    <div className="bg-purple-800/30 backdrop-blur-sm rounded-xl p-5 border border-purple-600/50 shadow-sm">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-lg font-semibold text-blue-900">Claim Code</h3>
+                        <h3 className="text-lg font-semibold text-white">Claim Code</h3>
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => setShowResultClaimCode(!showResultClaimCode)}
@@ -1374,58 +1391,72 @@ function App() {
                           </button>
                           <button
                             onClick={() => copyToClipboard(`${result.applicationId}-${result.claimCode}`, 'claimCode')}
-                            className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
                           >
                             <Copy className="w-4 h-4" />
                             <span>{copiedField === 'claimCode' ? 'Copied!' : 'Copy'}</span>
                           </button>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border-2 border-blue-300">
+                      <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-600/30">
                         {showResultClaimCode ? (
-                          <p className="font-mono text-lg font-bold text-gray-900 text-center tracking-wider break-all">
+                          <p className="font-mono text-lg font-bold text-purple-100 text-center tracking-wider break-all">
                             {result.applicationId}-{result.claimCode}
                           </p>
                         ) : (
-                          <p className="font-mono text-lg font-bold text-gray-400 text-center tracking-wider">
+                          <p className="font-mono text-lg font-bold text-purple-300 text-center tracking-wider">
                             •••••••••-••••••••••••••••••
                           </p>
                         )}
                       </div>
-                      <p className="text-blue-700 text-sm mt-3 text-center">
+                      <p className="text-purple-200 text-sm mt-3 text-center">
                         Share this code with the recipient to claim their funds
                       </p>
                     </div>
                   )}
 
                   {/* Transaction Details */}
-                  <div className="bg-purple-800/20 rounded-xl p-4 space-y-3">
-                    <h4 className="font-medium text-white text-sm">Transaction Details</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-purple-200">Contract Creation:</span>
-                        <a
-                          href={getExplorerUrl(result.transactionId)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-300 hover:text-purple-100 flex items-center space-x-1"
-                        >
-                          <span className="font-mono">{result.transactionId.slice(0, 8)}...{result.transactionId.slice(-6)}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                  <div className="bg-purple-800/30 backdrop-blur-sm rounded-xl p-5 border border-purple-600/50 shadow-sm">
+                    <h3 className="text-lg font-semibold text-white mb-4">Transaction Details</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm text-purple-200 mb-1">Amount Sent</p>
+                        <p className="text-2xl font-bold text-white">{result.amount} ALGO</p>
                       </div>
-                      {result.fundingTransactionId && (
-                        <div className="flex justify-between">
-                          <span className="text-purple-200">Contract Funding:</span>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm text-purple-200">Contract Creation ID</p>
                           <a
-                            href={getExplorerUrl(result.fundingTransactionId)}
+                            href={getExplorerUrl(result.transactionId)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-purple-300 hover:text-purple-100 flex items-center space-x-1"
+                            className="flex items-center space-x-1 text-xs text-purple-300 hover:text-purple-100"
                           >
-                            <span className="font-mono">{result.fundingTransactionId.slice(0, 8)}...{result.fundingTransactionId.slice(-6)}</span>
                             <ExternalLink className="w-3 h-3" />
+                            <span>Explorer</span>
                           </a>
+                        </div>
+                        <p className="font-mono text-sm text-purple-100 bg-purple-900/30 px-3 py-2 rounded border border-purple-600/30 break-all">
+                          {result.transactionId}
+                        </p>
+                      </div>
+                      {result.fundingTransactionId && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-sm text-purple-200">Funding Transaction ID</p>
+                            <a
+                              href={getExplorerUrl(result.fundingTransactionId)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center space-x-1 text-xs text-purple-300 hover:text-purple-100"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Explorer</span>
+                            </a>
+                          </div>
+                          <p className="font-mono text-sm text-purple-100 bg-purple-900/30 px-3 py-2 rounded border border-purple-600/30 break-all">
+                            {result.fundingTransactionId}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1560,7 +1591,7 @@ function App() {
                   {/* Recipient Input */}
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">
-                      Recipient Email
+                      Recipient Email (Optional)
                     </label>
                     <div className="relative">
                       <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400">
@@ -1637,8 +1668,8 @@ function App() {
           <>
             {/* Claim Success Result */}
             {claimResult && claimStep === 'complete' && (
-              <div className="mb-8 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-2xl overflow-hidden shadow-lg">
-                <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-6">
+              <div className="mb-8 bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                       <CheckCircle className="w-7 h-7 text-white" />
@@ -1654,7 +1685,7 @@ function App() {
                 
                 <div className="p-6 space-y-4">
                   {/* Transaction Details */}
-                  <div className="bg-purple-800/20 rounded-xl p-5 border border-purple-600/30 shadow-sm">
+                  <div className="bg-purple-800/30 backdrop-blur-sm rounded-xl p-5 border border-purple-600/50 shadow-sm">
                     <h3 className="text-lg font-semibold text-white mb-4">Claim Details</h3>
                     <div className="space-y-3">
                       <div>
@@ -2319,8 +2350,8 @@ function App() {
               </div>
             )}
 
-            {/* Refund Form */}
-            {refundStep !== 'complete' && (
+            {/* Refund Form - Card removed per user request */}
+            {false && refundStep !== 'complete' && (
               <div data-refund-form className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
                 {/* Tab Navigation */}
                 <div className="px-6 pt-6 pb-4">
@@ -2527,10 +2558,14 @@ function App() {
                 className={`px-4 py-2 text-white rounded-lg transition-colors font-medium ${
                   confirmDialog.type === 'refund' 
                     ? 'bg-yellow-600 hover:bg-yellow-700' 
+                    : confirmDialog.type === 'no_email'
+                    ? 'bg-purple-600 hover:bg-purple-700'
                     : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {confirmDialog.type === 'refund' ? 'Refund' : 'Delete & Reclaim'}
+                {confirmDialog.type === 'refund' ? 'Refund' : 
+                 confirmDialog.type === 'no_email' ? 'Send Without Email' : 
+                 'Delete & Reclaim'}
               </button>
             </div>
           </div>
