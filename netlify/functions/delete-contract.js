@@ -29,7 +29,7 @@ export const handler = async (event, context) => {
   try {
     const { applicationId, walletAddress, network = 'testnet' } = JSON.parse(event.body);
     
-    console.log(`📥 Received delete-contract request for app ${applicationId}`);
+    console.log(`📥 Received CloseOut request for app ${applicationId}`);
     
     // Validate network
     if (!NETWORK_CONFIGS[network]) {
@@ -84,17 +84,17 @@ export const handler = async (event, context) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ 
-          error: 'Only the creator of the application can delete it' 
+          error: 'Only the creator of the application can CloseOut it' 
         })
       };
     }
     
-    // Check if contract has zero balance
+    // Check if contract has minimal balance (allow up to 0.01 ALGO remaining)
     const appAddress = algosdk.getApplicationAddress(applicationId);
     const contractAccountInfo = await algodClient.accountInformation(appAddress).do();
     const contractBalance = Number(contractAccountInfo.amount);
     
-    if (contractBalance > 0) {
+    if (contractBalance > 10000) { // 0.01 ALGO in microAlgos
       return {
         statusCode: 400,
         headers: {
@@ -102,7 +102,7 @@ export const handler = async (event, context) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          error: `Cannot delete contract with non-zero balance. Current balance: ${contractBalance / 1000000} ALGO. Please refund or claim first.`
+          error: `Cannot CloseOut contract with significant balance. Current balance: ${contractBalance / 1000000} ALGO. Please refund or claim first.`
         })
       };
     }
@@ -121,7 +121,7 @@ export const handler = async (event, context) => {
     const txnToSign = Buffer.from(algosdk.encodeUnsignedTransaction(deleteTxn)).toString('base64');
     const txId = deleteTxn.txID();
     
-    console.log(`✅ Delete transaction created for app ${applicationId}: ${txId}`);
+    console.log(`✅ CloseOut transaction created for app ${applicationId}: ${txId}`);
     
     return {
       statusCode: 200,
@@ -133,12 +133,12 @@ export const handler = async (event, context) => {
         transactionToSign: txnToSign,
         transactionId: txId,
         applicationId: applicationId,
-        message: 'Transaction created successfully. Sign and submit to delete the contract.'
+        message: 'Transaction created successfully. Sign and submit to CloseOut the contract.'
       })
     };
     
   } catch (error) {
-    console.error('❌ Error creating delete transaction:', error);
+    console.error('❌ Error creating CloseOut transaction:', error);
     return {
       statusCode: 500,
       headers: {
@@ -146,7 +146,7 @@ export const handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 
-        error: error.message || 'Failed to create delete transaction' 
+        error: error.message || 'Failed to create CloseOut transaction' 
       })
     };
   }

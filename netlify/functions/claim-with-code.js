@@ -102,7 +102,7 @@ export const handler = async (event, context) => {
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       appArgs: [
         new TextEncoder().encode('claim'),
-        claimHash
+        new TextEncoder().encode(normalizedClaimCode)
       ]
     });
     
