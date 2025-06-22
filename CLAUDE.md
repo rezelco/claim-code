@@ -7,3 +7,9 @@ Standard Workflow
 6. Make every task and code change you do as simple as possible. We want to avoid making any massive or complex changes. Every change should impact as little code as possible. Everything is about simplicity.
 7. Finally, add a review section to the todo.md file with a summary of the changes you made and any other relevant information.
 
+# Smart Contract Updates
+IMPORTANT: When updating smart contract code, ALWAYS update BOTH locations:
+1. `/server/index.js` - Server-side contract code  
+2. `/netlify/functions/create-claim.js` - Netlify function contract code
+Both files contain the same TEAL smart contract code and must be kept in sync.
+

@@ -961,7 +961,7 @@ function App() {
       console.log(`✅ Contract ${applicationId} deleted successfully: ${submitResponse.transactionId}`);
       
       // Show success toast
-      showToast('Contract deleted • 0.1 ALGO reclaimed');
+      showToast('Contract closed successfully');
       
       // Reload contracts to reflect changes
       await loadWalletContracts();
@@ -1066,15 +1066,11 @@ function App() {
       .reduce((sum, contract) => sum + contract.amount, 0);
   };
 
-  const getTotalLocked = () => {
-    // Each contract locks 0.1 ALGO as minimum balance
-    return contracts.length * 0.1;
-  };
 
-  const getTotalReclaimable = () => {
-    // Only refunded and claimed contracts can be deleted to reclaim 0.1 ALGO each
-    const reclaimableContracts = [...getRefundedContracts(), ...getClaimedContracts()];
-    return reclaimableContracts.filter(contract => contract.canDelete).length * 0.1;
+  const getTotalDeleteCount = () => {
+    // Count of claimed and refunded contracts that can be closed out
+    const closeOutContracts = [...getRefundedContracts(), ...getClaimedContracts()];
+    return closeOutContracts.filter(contract => contract.canDelete).length;
   };
 
   // Helper function to check if refund is available (5+ minutes after creation)
@@ -1133,7 +1129,7 @@ function App() {
         isOpen: true,
         type: 'delete',
         title: 'Delete Contract',
-        message: `Delete Contract?\nThis will permanently remove the contract and return the 0.1 ALGO minimum balance to your wallet.`,
+        message: `Delete Contract?\nThis will permanently remove the contract from the blockchain.`,
         applicationId,
         onConfirm: () => {
           setConfirmDialog(prev => ({ ...prev, isOpen: false }));
@@ -2018,12 +2014,12 @@ function App() {
                             <div className="text-sm text-blue-200">Total refundable</div>
                           </div>
                           <div className="bg-yellow-800/30 rounded-lg p-4 text-center">
-                            <div className="text-2xl font-bold text-yellow-300">{getTotalLocked().toFixed(1)} ALGO</div>
-                            <div className="text-sm text-yellow-200">Locked in contracts ({contracts.length} × 0.1)</div>
+                            <div className="text-2xl font-bold text-yellow-300">{getActiveContracts().length}</div>
+                            <div className="text-sm text-yellow-200">Active contracts (pending)</div>
                           </div>
                           <div className="bg-green-800/30 rounded-lg p-4 text-center">
-                            <div className="text-2xl font-bold text-green-300">{getTotalReclaimable().toFixed(1)} ALGO</div>
-                            <div className="text-sm text-green-200">Reclaimable by deleting</div>
+                            <div className="text-2xl font-bold text-green-300">{getTotalDeleteCount()}</div>
+                            <div className="text-sm text-green-200">Available to Delete</div>
                           </div>
                         </div>
                       </div>
@@ -2053,7 +2049,7 @@ function App() {
                                     <div className="flex-1 space-y-2">
                                       <div className="flex items-center justify-between">
                                         <span className="font-mono text-lg font-bold text-white">
-                                          💸 {contract.amount} ALGO (+ 0.1 ALGO locked)
+                                          💸 {contract.amount} ALGO
                                         </span>
                                         <span className="font-mono text-xs text-blue-300 bg-blue-800/30 px-2 py-1 rounded">
                                           #{contract.applicationId}
@@ -2115,7 +2111,7 @@ function App() {
                                           onClick={() => handleInlineDelete(contract.applicationId)}
                                           disabled={deleteLoading[contract.applicationId]}
                                           className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete to reclaim 0.1 ALGO"
+                                          title="Delete contract"
                                         >
                                           {deleteLoading[contract.applicationId] ? (
                                             <>
@@ -2123,7 +2119,7 @@ function App() {
                                               Deleting...
                                             </>
                                           ) : (
-                                            "Delete to reclaim 0.1 ALGO"
+                                            "Delete"
                                           )}
                                         </button>
                                       )}
@@ -2158,11 +2154,6 @@ function App() {
                                         </span>
                                       </div>
                                       <div className="flex items-center space-x-3">
-                                        <span className="font-mono text-lg font-bold text-white">
-                                          💰 0.1 ALGO minimum balance locked
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center space-x-3">
                                         <span className="text-gray-300 text-sm">
                                           Sent {getTimeAgo(contract)} • Refunded recently
                                         </span>
@@ -2185,12 +2176,12 @@ function App() {
                                           onClick={() => handleInlineDelete(contract.applicationId)}
                                           disabled={deleteLoading[contract.applicationId]}
                                           className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete to reclaim 0.1 ALGO"
+                                          title="Delete contract"
                                         >
                                           {deleteLoading[contract.applicationId] ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                           ) : (
-                                            "Delete to reclaim 0.1 ALGO"
+                                            "Delete"
                                           )}
                                         </button>
                                       )}
@@ -2225,11 +2216,6 @@ function App() {
                                         </span>
                                       </div>
                                       <div className="flex items-center space-x-3">
-                                        <span className="font-mono text-lg font-bold text-white">
-                                          💰 0.1 ALGO minimum balance locked
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center space-x-3">
                                         <span className="text-green-300 text-sm">
                                           Sent {getTimeAgo(contract)} • Claimed recently
                                         </span>
@@ -2252,12 +2238,12 @@ function App() {
                                           onClick={() => handleInlineDelete(contract.applicationId)}
                                           disabled={deleteLoading[contract.applicationId]}
                                           className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete to reclaim 0.1 ALGO"
+                                          title="Delete contract"
                                         >
                                           {deleteLoading[contract.applicationId] ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                           ) : (
-                                            "Delete to reclaim 0.1 ALGO"
+                                            "Delete"
                                           )}
                                         </button>
                                       )}
@@ -2565,7 +2551,7 @@ function App() {
               >
                 {confirmDialog.type === 'refund' ? 'Refund' : 
                  confirmDialog.type === 'no_email' ? 'Send Without Email' : 
-                 'Delete & Reclaim'}
+                 'Delete'}
               </button>
             </div>
           </div>

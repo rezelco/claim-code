@@ -56,7 +56,8 @@ function generateClaimCode() {
 
 // Hash claim code for smart contract
 function hashClaimCode(code) {
-  return crypto.createHash('sha256').update(code).digest();
+  // Ensure we're working with consistent UTF-8 encoding
+  return crypto.createHash('sha256').update(code, 'utf8').digest();
 }
 
 // Store claim information
@@ -87,161 +88,233 @@ function markClaimAsUsed(claimCode) {
 function createHashClaimContractTeal(hashedClaimCode, senderAddress, amount) {
   const tealProgram = `#pragma version 6
 
-// Global state variables:
-// "hash" - bytes: SHA256 hash of the claim code
-// "amount" - uint64: Amount to be claimed in microAlgos
-// "sender" - bytes: Original sender address for refunds
-// "created" - uint64: Creation timestamp
-// "claimed" - uint64: 1 if claimed, 0 if not
-
-// Application call handling
+// Branch on application lifecycle call
 txn ApplicationID
 int 0
 ==
-bnz creation
+bnz handle_creation
 
-// Check if this is a NoOp call
 txn OnCompletion
 int NoOp
 ==
-bnz handle_call
+bnz handle_noop
 
-// Reject all other operations
-int 0
-return
-
-creation:
-// Store the hash, amount, sender, and creation time in global state
-byte "hash"
-txna ApplicationArgs 1
-app_global_put
-
-byte "amount"
-txna ApplicationArgs 2
-btoi
-app_global_put
-
-byte "sender"
-txna ApplicationArgs 3
-app_global_put
-
-byte "created"
-global LatestTimestamp
-app_global_put
-
-// Initialize claimed status
-byte "claimed"
-int 0
-app_global_put
-
-int 1
-return
-
-handle_call:
-// Check the first argument to determine the operation
-txna ApplicationArgs 0
-byte "claim"
+txn OnCompletion
+int CloseOut
 ==
-bnz handle_claim
+bnz handle_closeout
 
-txna ApplicationArgs 0
-byte "refund"
+txn OnCompletion
+int DeleteApplication
 ==
-bnz handle_refund
+bnz handle_delete
 
-// Unknown operation
+// Default: reject
 int 0
 return
 
+////////////////////////
+// Handle App Creation
+////////////////////////
+handle_creation:
+    // Store: hash, amount, sender, created, claimed = 0
+    byte "hash"
+    txna ApplicationArgs 1
+    app_global_put
+
+    byte "amount"
+    txna ApplicationArgs 2
+    btoi
+    app_global_put
+
+    byte "sender"
+    txna ApplicationArgs 3
+    app_global_put
+
+    byte "created"
+    global LatestTimestamp
+    app_global_put
+
+    byte "claimed"
+    int 0
+    app_global_put
+
+    int 1
+    return
+
+////////////////////////
+// Handle NoOp (claim or refund)
+////////////////////////
+handle_noop:
+    txna ApplicationArgs 0
+    byte "claim"
+    ==
+    bnz handle_claim
+
+    txna ApplicationArgs 0
+    byte "refund"
+    ==
+    bnz handle_refund
+
+    int 0
+    return
+
+////////////////////////
+// Secure Claim
+////////////////////////
 handle_claim:
-// Verify the claim code by hashing the provided code
-txna ApplicationArgs 1
-sha256
-byte "hash"
-app_global_get
-==
-assert
+    // Require: hash(plaintext_code) == stored hash AND not claimed
+    txna ApplicationArgs 1
+    sha256
+    byte "hash"
+    app_global_get
+    ==
+    assert
 
-// Check if already claimed
-byte "claimed"
-app_global_get
-int 0
-==
-assert
+    byte "claimed"
+    app_global_get
+    int 0
+    ==
+    assert
 
-// Mark as claimed
-byte "claimed"
-int 1
-app_global_put
+    // Set claimed = 1
+    byte "claimed"
+    int 1
+    app_global_put
 
-// Transfer funds to claimer with inner transaction
-itxn_begin
-int pay
-itxn_field TypeEnum
-txn Sender
-itxn_field Receiver
-byte "amount"
-app_global_get
-itxn_field Amount
-int 1000
-itxn_field Fee
-// Send remaining balance back to claimer
-txn Sender
-itxn_field CloseRemainderTo
-itxn_submit
+    // Ensure contract has sufficient balance
+    global CurrentApplicationAddress
+    balance
+    byte "amount"
+    app_global_get
+    >=
+    assert
 
-int 1
-return
+    // Send amount to caller (txn Sender)
+    itxn_begin
+    int pay
+    itxn_field TypeEnum
 
+    txn Sender
+    itxn_field Receiver
+
+    byte "amount"
+    app_global_get
+    itxn_field Amount
+
+    int 1000
+    itxn_field Fee
+
+    txn Sender
+    itxn_field CloseRemainderTo
+
+    itxn_submit
+
+    int 1
+    return
+
+////////////////////////
+// Refund (after 5 minutes, if not claimed, by original sender)
+////////////////////////
 handle_refund:
-// Check if 5 minutes (300 seconds) have passed
-global LatestTimestamp
-byte "created"
-app_global_get
--
-int 300
->=
-assert
+    // Must be > 5 minutes since creation
+    global LatestTimestamp
+    byte "created"
+    app_global_get
+    -
+    int 300
+    >=
+    assert
 
-// Check if not claimed yet
-byte "claimed"
-app_global_get
-int 0
-==
-assert
+    // Must not already be claimed
+    byte "claimed"
+    app_global_get
+    int 0
+    ==
+    assert
 
-// Check if caller is the original sender
-txn Sender
-byte "sender"
-app_global_get
-==
-assert
+    // Must be original sender
+    txn Sender
+    byte "sender"
+    app_global_get
+    ==
+    assert
 
-// Mark as claimed to prevent double refund
-byte "claimed"
-int 1
-app_global_put
+    // Set claimed = 1
+    byte "claimed"
+    int 1
+    app_global_put
 
-// Refund to original sender with inner transaction
-itxn_begin
-int pay
-itxn_field TypeEnum
-byte "sender"
-app_global_get
-itxn_field Receiver
-byte "amount"
-app_global_get
-itxn_field Amount
-int 1000
-itxn_field Fee
-// Send remaining balance back to sender
-byte "sender"
-app_global_get
-itxn_field CloseRemainderTo
-itxn_submit
+    // Ensure contract has sufficient balance
+    global CurrentApplicationAddress
+    balance
+    byte "amount"
+    app_global_get
+    >=
+    assert
 
-int 1
-return`;
+    // Refund sender
+    itxn_begin
+    int pay
+    itxn_field TypeEnum
+
+    byte "sender"
+    app_global_get
+    itxn_field Receiver
+
+    byte "amount"
+    app_global_get
+    itxn_field Amount
+
+    int 1000
+    itxn_field Fee
+
+    byte "sender"
+    app_global_get
+    itxn_field CloseRemainderTo
+
+    itxn_submit
+
+    int 1
+    return
+
+////////////////////////
+// CloseOut Safety (only if balance is 0 and caller is sender)
+////////////////////////
+handle_closeout:
+    txn Sender
+    byte "sender"
+    app_global_get
+    ==
+    assert
+
+    global CurrentApplicationAddress
+    balance
+    int 10000  // Allow up to 0.01 ALGO remaining (for fees/minimum balance)
+    <=
+    assert
+
+    int 1
+    return
+
+////////////////////////
+// Delete Application (only if balance is minimal and caller is sender)
+////////////////////////
+handle_delete:
+    txn Sender
+    byte "sender"
+    app_global_get
+    ==
+    assert
+
+    global CurrentApplicationAddress
+    balance
+    int 10000  // Allow up to 0.01 ALGO remaining (for fees/minimum balance)
+    <=
+    assert
+
+    int 1
+    return`;
 
   return tealProgram;
 }
