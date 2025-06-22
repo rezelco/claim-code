@@ -340,7 +340,23 @@ export const handler = async (event, context) => {
   }
 
   try {
-    const { amount, recipient, message, senderAddress, network = 'testnet' } = JSON.parse(event.body);
+    // Parse and validate request body
+    let requestBody;
+    try {
+      requestBody = JSON.parse(event.body);
+    } catch (parseError) {
+      console.error('❌ Invalid JSON in request body:', parseError.message);
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: 'Invalid JSON in request body',
+          details: parseError.message
+        })
+      };
+    }
+
+    const { amount, recipient, message, senderAddress, network = 'testnet' } = requestBody;
 
     console.log(`📥 Received create-claim request:`, {
       amount,
