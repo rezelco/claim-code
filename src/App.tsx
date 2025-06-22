@@ -778,6 +778,7 @@ function App() {
       // Reset form
       setRefundApplicationId('');
     } catch (err) {
+      console.error('❌ Refund error details:', err);
       setRefundError(err instanceof Error ? err.message : 'Failed to refund funds');
       setRefundStep('form');
     } finally {
@@ -1149,7 +1150,7 @@ function App() {
     setToast({ isVisible: true, message, type });
     setTimeout(() => {
       setToast(prev => ({ ...prev, isVisible: false }));
-    }, 4000);
+    }, 8000);
   };
 
   const isValidEmail = (email: string) => {
@@ -2243,8 +2244,8 @@ function App() {
               </div>
             </div>
 
-            {/* Refund Success Result */}
-            {refundResult && refundStep === 'complete' && (
+            {/* Refund Success Result - Removed per user request */}
+            {false && refundResult && refundStep === 'complete' && (
               <div className="mb-8 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-2xl overflow-hidden shadow-lg">
                 <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-6">
                   <div className="flex items-center space-x-3">
