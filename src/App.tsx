@@ -1350,6 +1350,39 @@ function App() {
             {/* Send Success Result */}
             {result && step === 'complete' && (
               <div className="mb-8 bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden shadow-lg">
+                {/* Tab Navigation */}
+                <div className="px-3 sm:px-6 pt-6 pb-4">
+                  <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
+                    <button
+                      onClick={() => handleTabChange('send')}
+                      className="px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <Send className="w-4 h-4" />
+                        <span className="text-sm sm:text-base">Send</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('claim')}
+                      className="px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <Download className="w-4 h-4" />
+                        <span className="text-sm sm:text-base">Claim</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('refund')}
+                      className="px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span className="text-sm sm:text-base">Contracts</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -1478,7 +1511,7 @@ function App() {
                       className="flex-1 py-3 bg-purple-700/30 hover:bg-purple-600/40 text-purple-100 font-semibold rounded-xl transition-all flex items-center justify-center space-x-2"
                     >
                       <ExternalLink className="w-5 h-5" />
-                      <span>View Contract</span>
+                      <span>View on Explorer</span>
                     </a>
                   </div>
                 </div>
@@ -1669,13 +1702,46 @@ function App() {
             {/* Claim Success Result */}
             {claimResult && claimStep === 'complete' && (
               <div className="mb-8 bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden shadow-lg">
+                {/* Tab Navigation */}
+                <div className="px-3 sm:px-6 pt-6 pb-4">
+                  <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
+                    <button
+                      onClick={() => handleTabChange('send')}
+                      className="px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <Send className="w-4 h-4" />
+                        <span className="text-sm sm:text-base">Send</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('claim')}
+                      className="px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <Download className="w-4 h-4" />
+                        <span className="text-sm sm:text-base">Claim</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('refund')}
+                      className="px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RefreshCw className="w-4 h-4" />
+                        <span className="text-sm sm:text-base">Contracts</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                
                 <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                       <CheckCircle className="w-7 h-7 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-white">🎉 Success! Funds have been sent to your wallet.</h2>
+                      <h2 className="text-2xl font-bold text-white">Funds Claimed Successfully!</h2>
                       <p className="text-purple-100 mt-1">
                         {claimResult.amount} ALGO claimed on {getNetworkConfig().name}
                       </p>
