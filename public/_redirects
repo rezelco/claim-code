@@ -1,2 +1,5 @@
-# Redirect all routes to index.html for client-side routing
+# API routes go to Netlify functions
+/api/*  /.netlify/functions/:splat  200
+
+# All other routes go to index.html for client-side routing
 /*    /index.html   200
