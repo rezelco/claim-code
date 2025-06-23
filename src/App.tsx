@@ -1255,18 +1255,18 @@ function App() {
 
       {/* Header */}
       <div className="bg-purple-900/90 backdrop-blur-sm border-b border-purple-800/30 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">
               <Send className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">RandCash</h1>
-              <p className="text-sm text-purple-100">Send crypto with claim codes</p>
+              <p className="text-sm text-purple-100 hidden sm:block">Send crypto with claim codes</p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Network Selector */}
             <NetworkSelector onNetworkChange={handleNetworkChange} />
             
@@ -1274,23 +1274,27 @@ function App() {
               console.log(`🔄 Rendering header: walletConnected=${walletConnected}, connectedAccount=${connectedAccount}`);
               return walletConnected;
             })() ? (
-              <div className="flex items-center space-x-3">
-                <div className="text-right">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-white">Pera Wallet</p>
                   <p className="text-xs text-purple-200">{connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}</p>
                 </div>
+                <div className="text-right sm:hidden">
+                  <p className="text-xs text-purple-200">{connectedAccount.slice(0, 6)}...</p>
+                </div>
                 <button
                   onClick={handleDisconnectWallet}
-                  className="px-4 py-2 bg-purple-500/50 hover:bg-purple-500/70 text-white rounded-lg font-medium transition-colors"
+                  className="px-3 sm:px-4 py-2 bg-purple-500/50 hover:bg-purple-500/70 text-white rounded-lg font-medium transition-colors text-sm"
                 >
-                  Disconnect
+                  <span className="hidden sm:inline">Disconnect</span>
+                  <span className="sm:hidden">Disc</span>
                 </button>
               </div>
             ) : (
               <button
                 onClick={handleConnectWallet}
                 disabled={isLoading || claimLoading}
-                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:transform-none shadow-lg"
+                className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-400 hover:to-blue-400 disabled:from-purple-600/50 disabled:to-blue-600/50 text-white rounded-lg font-medium transition-all transform hover:scale-[1.02] disabled:transform-none shadow-lg text-sm"
               >
                 <Wallet className="w-4 h-4" />
                 <span>Connect</span>
@@ -1367,7 +1371,7 @@ function App() {
                     <div className="bg-purple-800/30 backdrop-blur-sm rounded-xl p-5 border border-purple-600/50 shadow-sm">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-semibold text-white">Claim Code</h3>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1 sm:space-x-2">
                           <button
                             onClick={() => setShowResultClaimCode(!showResultClaimCode)}
                             className="flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors"
@@ -1485,45 +1489,45 @@ function App() {
             {step !== 'complete' && (
               <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
                 {/* Tab Navigation */}
-                <div className="px-6 pt-6 pb-4">
-                  <div className="flex gap-4 justify-center">
+                <div className="px-3 sm:px-6 pt-6 pb-4">
+                  <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
                     <button
                       onClick={() => handleTabChange('send')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'send'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Send className="w-4 h-4" />
-                        <span>Send</span>
+                        <span className="text-sm sm:text-base">Send</span>
                       </div>
                     </button>
                     <button
                       onClick={() => handleTabChange('claim')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'claim'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Download className="w-4 h-4" />
-                        <span>Claim</span>
+                        <span className="text-sm sm:text-base">Claim</span>
                       </div>
                     </button>
                     <button
                       onClick={() => handleTabChange('refund')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'refund'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <RefreshCw className="w-4 h-4" />
-                        <span>Contracts</span>
+                        <span className="text-sm sm:text-base">Contracts</span>
                       </div>
                     </button>
                   </div>
@@ -1741,45 +1745,45 @@ function App() {
             {claimStep !== 'complete' && (
               <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
                 {/* Tab Navigation */}
-                <div className="px-6 pt-6 pb-4">
-                  <div className="flex gap-4 justify-center">
+                <div className="px-3 sm:px-6 pt-6 pb-4">
+                  <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
                     <button
                       onClick={() => handleTabChange('send')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'send'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Send className="w-4 h-4" />
-                        <span>Send</span>
+                        <span className="text-sm sm:text-base">Send</span>
                       </div>
                     </button>
                     <button
                       onClick={() => handleTabChange('claim')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'claim'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Download className="w-4 h-4" />
-                        <span>Claim</span>
+                        <span className="text-sm sm:text-base">Claim</span>
                       </div>
                     </button>
                     <button
                       onClick={() => handleTabChange('refund')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'refund'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <RefreshCw className="w-4 h-4" />
-                        <span>Contracts</span>
+                        <span className="text-sm sm:text-base">Contracts</span>
                       </div>
                     </button>
                   </div>
@@ -1887,47 +1891,47 @@ function App() {
         {activeTab === 'refund' && (
           <>
             {/* Contract Management Section */}
-            <div className="mb-8 bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+            <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
               {/* Tab Navigation */}
-              <div className="px-6 pt-6 pb-4">
-                <div className="flex gap-4 justify-center">
+              <div className="px-3 sm:px-6 pt-6 pb-4">
+                <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
                   <button
                     onClick={() => handleTabChange('send')}
-                    className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                    className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                       activeTab === 'send'
                         ? 'bg-white text-purple-700 shadow-xl transform scale-105 border-2 border-cyan-400'
                         : 'bg-purple-500/20 text-white hover:bg-purple-500/30 backdrop-blur-sm border border-purple-400/30'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 sm:space-x-2">
                       <Send className="w-4 h-4" />
-                      <span>Send</span>
+                      <span className="text-sm sm:text-base">Send</span>
                     </div>
                   </button>
                   <button
                     onClick={() => handleTabChange('claim')}
-                    className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                    className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                       activeTab === 'claim'
                         ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                         : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 sm:space-x-2">
                       <Download className="w-4 h-4" />
-                      <span>Claim</span>
+                      <span className="text-sm sm:text-base">Claim</span>
                     </div>
                   </button>
                   <button
                     onClick={() => handleTabChange('refund')}
-                    className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                    className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                       activeTab === 'refund'
                         ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                         : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 sm:space-x-2">
                       <RefreshCw className="w-4 h-4" />
-                      <span>Contracts</span>
+                      <span className="text-sm sm:text-base">Contracts</span>
                     </div>
                   </button>
                 </div>
@@ -2340,45 +2344,45 @@ function App() {
             {false && refundStep !== 'complete' && (
               <div data-refund-form className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
                 {/* Tab Navigation */}
-                <div className="px-6 pt-6 pb-4">
-                  <div className="flex gap-4 justify-center">
+                <div className="px-3 sm:px-6 pt-6 pb-4">
+                  <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
                     <button
                       onClick={() => handleTabChange('send')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'send'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Send className="w-4 h-4" />
-                        <span>Send</span>
+                        <span className="text-sm sm:text-base">Send</span>
                       </div>
                     </button>
                     <button
                       onClick={() => handleTabChange('claim')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'claim'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <Download className="w-4 h-4" />
-                        <span>Claim</span>
+                        <span className="text-sm sm:text-base">Claim</span>
                       </div>
                     </button>
                     <button
                       onClick={() => handleTabChange('refund')}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg ${
+                      className={`px-4 sm:px-8 py-2 sm:py-3 rounded-xl font-medium transition-all shadow-lg whitespace-nowrap ${
                         activeTab === 'refund'
                           ? 'bg-purple-800/30 text-white shadow-xl transform scale-105 border-2 border-cyan-400 backdrop-blur-sm'
                           : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 sm:space-x-2">
                         <RefreshCw className="w-4 h-4" />
-                        <span>Contracts</span>
+                        <span className="text-sm sm:text-base">Contracts</span>
                       </div>
                     </button>
                   </div>
