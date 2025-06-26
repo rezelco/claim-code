@@ -2648,6 +2648,13 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* White Circle Logo - Bottom Right */}
+      <img 
+        src="/white_circle_360x360.png" 
+        alt="Logo" 
+        className="fixed bottom-4 right-4 w-16 h-16 opacity-80 z-10"
+      />
     </div>
   );
 }
