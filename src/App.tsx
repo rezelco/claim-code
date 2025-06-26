@@ -1333,35 +1333,38 @@ function App() {
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Network Environment Warning */}
-        <div className={`mb-6 ${isTestNet() ? 'bg-yellow-900/30 border-yellow-600/50' : 'bg-blue-900/30 border border-blue-600/50'} rounded-xl p-4 flex items-start space-x-3`}>
-          <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-300' : 'text-blue-300'} flex-shrink-0 mt-0.5`} />
-          <div>
-            <h3 className={`${isTestNet() ? 'text-yellow-200' : 'text-blue-200'} font-medium`}>
-              {getNetworkConfig().name} Environment
-            </h3>
-            <p className={`${isTestNet() ? 'text-yellow-100' : 'text-blue-100'} text-sm mt-1`}>
-              {isTestNet() ? (
-                <>
-                  This app is running on Algorand TestNet. Use TestNet Algos for testing. 
-                  Get free TestNet Algos from the{' '}
-                  <a 
-                    href={getNetworkConfig().dispenserUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="underline hover:no-underline"
-                  >
-                    Algorand TestNet Dispenser
-                  </a>.
-                </>
-              ) : (
-                'This app is running on Algorand MainNet. Real ALGO will be used for transactions. Please double-check all details before sending.'
-              )}
-            </p>
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+          {/* Network Environment Warning */}
+          <div className="lg:col-span-4 mb-6">
+            <div className="w-full max-w-lg mx-auto">
+              <div className={`${isTestNet() ? 'bg-yellow-900/30 border-yellow-600/50' : 'bg-blue-900/30 border border-blue-600/50'} rounded-xl p-4 flex items-start space-x-3`}>
+                <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-300' : 'text-blue-300'} flex-shrink-0 mt-0.5`} />
+                <div>
+                  <h3 className={`${isTestNet() ? 'text-yellow-200' : 'text-blue-200'} font-medium`}>
+                    {getNetworkConfig().name} Environment
+                  </h3>
+                  <p className={`${isTestNet() ? 'text-yellow-100' : 'text-blue-100'} text-sm mt-1`}>
+                    {isTestNet() ? (
+                      <>
+                        This app is running on Algorand TestNet. Use TestNet Algos for testing. 
+                        Get free TestNet Algos from the{' '}
+                        <a 
+                          href={getNetworkConfig().dispenserUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="underline hover:no-underline"
+                        >
+                          Algorand TestNet Dispenser
+                        </a>.
+                      </>
+                    ) : (
+                      'This app is running on Algorand MainNet. Real ALGO will be used for transactions. Please double-check all details before sending.'
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
           {/* Main Form Area - Left Side */}
           <div className="lg:col-span-4">
         {/* Reconnection Prompt */}
@@ -1562,7 +1565,7 @@ function App() {
 
             {/* Send Form */}
             {step !== 'complete' && (
-              <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+              <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden w-full max-w-lg mx-auto">
                 {/* Tab Navigation */}
                 <div className="px-3 sm:px-6 pt-6 pb-4">
                   <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
@@ -1842,7 +1845,7 @@ function App() {
 
             {/* Claim Form */}
             {claimStep !== 'complete' && (
-              <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+              <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden w-full max-w-lg mx-auto">
                 {/* Tab Navigation */}
                 <div className="px-3 sm:px-6 pt-6 pb-4">
                   <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
@@ -1987,7 +1990,7 @@ function App() {
         {activeTab === 'refund' && (
           <>
             {/* Contract Management Section */}
-            <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+            <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden w-full max-w-lg mx-auto">
               {/* Tab Navigation */}
               <div className="px-3 sm:px-6 pt-6 pb-4">
                 <div className="flex gap-2 sm:gap-4 justify-center flex-wrap">
@@ -2545,7 +2548,7 @@ function App() {
           
           {/* How it Works Sidebar - Right Side */}
           <div className="lg:col-span-2">
-            <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden sticky top-24">
+            <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden sticky top-24 w-full max-w-lg mx-auto">
               <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
                 <h2 className="text-2xl font-bold text-white">How it Works</h2>
               </div>
