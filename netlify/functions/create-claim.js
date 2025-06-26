@@ -420,17 +420,6 @@ export const handler = async (event, context) => {
       };
     }
 
-    // Additional validation for MainNet
-    if (network === 'mainnet' && amount > 10) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ error: 'Maximum amount on MainNet is 10 ALGO for safety' })
-      };
-    }
 
     console.log(`✅ Creating claim for ${amount} ALGO from ${validatedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
 

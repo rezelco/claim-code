@@ -30,7 +30,7 @@ const NETWORK_CONFIGS = {
 };
 
 // Create Algorand client for specific network
-function createAlgodClient(network = 'testnet') {
+function createAlgodClient(network = 'mainnet') {
   const config = NETWORK_CONFIGS[network];
   if (!config) {
     throw new Error(`Unsupported network: ${network}`);
@@ -714,10 +714,6 @@ app.post('/api/create-claim', async (req, res) => {
       return res.status(400).json({ error: `Invalid sender address: ${addressError.message}` });
     }
 
-    // Additional validation for MainNet
-    if (network === 'mainnet' && amount > 10) {
-      return res.status(400).json({ error: 'Maximum amount on MainNet is 10 ALGO for safety' });
-    }
 
     console.log(`✅ Creating claim for ${amount} ALGO from ${validatedSenderAddress} to ${recipient} on ${NETWORK_CONFIGS[network].name}`);
 
