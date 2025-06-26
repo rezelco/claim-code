@@ -1355,7 +1355,7 @@ function App() {
                   </a>.
                 </>
               ) : (
-                'This app is running on Algorand MainNet. Real ALGO will be used for all transactions. Please be careful and double-check all details before sending.'
+                'This app is running on Algorand MainNet. Real ALGO will be used for transactions. Please double-check all details before sending.'
               )}
             </p>
           </div>
@@ -1607,9 +1607,6 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
-                  <h2 className="text-2xl font-bold text-white">Send Cryptocurrency</h2>
-                </div>
                 
                 <div className="p-6 space-y-6">
                   {/* Progress Indicator */}
@@ -1683,14 +1680,14 @@ function App() {
                       Message (Optional)
                     </label>
                     <div className="relative">
-                      <div className="absolute left-3 top-3 text-purple-400">
+                      <div className="absolute left-3 top-4 text-purple-400">
                         <MessageSquare className="w-4 h-4" />
                       </div>
                       <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Add a personal message..."
-                        rows={3}
+                        rows={2}
                         disabled={isLoading}
                         className="w-full pl-10 pr-4 py-3 bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 resize-none transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed text-white placeholder-purple-300"
                       />
@@ -1890,9 +1887,6 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
-                  <h2 className="text-2xl font-bold text-white">Claim Funds</h2>
-                </div>
                 
                 <div className="p-6 space-y-6">
                   {/* Progress Indicator */}
@@ -2038,14 +2032,14 @@ function App() {
                   </button>
                 </div>
               </div>
-              <div className="bg-purple-600/20 backdrop-blur-sm px-6 py-6 border-b border-white/10">
-                <h2 className="text-2xl font-bold text-white">View Contracts</h2>
-              </div>
               
               <div className="p-6 space-y-6">
                 {/* Load Contracts Button */}
                 {!showContracts && (
                   <div className="text-center">
+                    <p className="text-purple-200 text-sm mb-4">
+                      View and manage all contracts you've created
+                    </p>
                     <button
                       onClick={walletConnected ? () => {
                         setShowContracts(true);
@@ -2057,9 +2051,6 @@ function App() {
                       {walletConnected ? <List className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
                       <span>{walletConnected ? 'Load Contracts' : 'Connect'}</span>
                     </button>
-                    <p className="text-purple-200 text-sm mt-2">
-                      View and manage all contracts you've created
-                    </p>
                   </div>
                 )}
 

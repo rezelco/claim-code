@@ -29,13 +29,21 @@
 
 "Select TestNet from the network dropdown before connecting your wallet."
 
+**[Show Pera Wallet app on phone]**
+
+"Important: Before connecting, I need to switch my Pera Wallet to TestNet as well. In the Pera Wallet app, I'll go to Settings, then Developer Settings, then Node Settings, and select TestNet to match what we selected on the website."
+
+**[Show navigation: Settings → Developer Settings → Node Settings → TestNet]**
+
+"This ensures both the app and my wallet are on the same network."
+
 **[Click "Connect Wallet" button → QR code appears]**
 
 "Now I'll click Connect Wallet, which shows me a QR code. If you don't have Pera Wallet yet, there's a convenient download QR code right here - just scan it with your phone's camera to get the app from your app store."
 
 **[Point to the connection QR code]**
 
-"With Pera Wallet installed, scan the connection QR code to link your wallet."
+"With Pera Wallet installed and set to TestNet, scan the connection QR code to link your wallet."
 
 **[Show wallet connected]**
 
