@@ -1,7 +1,7 @@
 import { NetworkType, NETWORK_CONFIGS } from '../types/network';
 
 class NetworkService {
-  private currentNetwork: NetworkType = 'testnet';
+  private currentNetwork: NetworkType = 'mainnet';
 
   constructor() {
     this.initializeFromStorage();

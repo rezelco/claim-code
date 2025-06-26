@@ -309,13 +309,6 @@ function App() {
       return false;
     }
     
-    // Additional validation for MainNet
-    if (isMainNet()) {
-      if (parseFloat(amount) > 10) {
-        setError('For safety, maximum amount on MainNet is 10 ALGO');
-        return false;
-      }
-    }
     
     return true;
   };
@@ -1275,12 +1268,46 @@ function App() {
               return walletConnected;
             })() ? (
               <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-medium text-white">Pera Wallet</p>
-                  <p className="text-xs text-purple-200">{connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}</p>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium text-white">Wallet Address</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(connectedAccount);
+                      setCopiedField('walletAddress');
+                      setTimeout(() => setCopiedField(''), 2000);
+                    }}
+                    className="text-xs text-purple-200 hover:text-white hover:bg-purple-500/20 px-2 py-1 rounded transition-all cursor-pointer inline-flex items-center gap-1 group"
+                    title={connectedAccount}
+                  >
+                    {copiedField === 'walletAddress' ? (
+                      <>
+                        <CheckCircle size={12} className="text-green-400" />
+                        <span className="text-green-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        {connectedAccount.slice(0, 8)}...{connectedAccount.slice(-6)}
+                        <Copy size={12} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+                      </>
+                    )}
+                  </button>
                 </div>
                 <div className="text-right sm:hidden">
-                  <p className="text-xs text-purple-200">{connectedAccount.slice(0, 6)}...</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(connectedAccount);
+                      setCopiedField('walletAddress');
+                      setTimeout(() => setCopiedField(''), 2000);
+                    }}
+                    className="text-xs text-purple-200 hover:text-white px-1 py-0.5 rounded transition-all cursor-pointer"
+                    title={connectedAccount}
+                  >
+                    {copiedField === 'walletAddress' ? (
+                      <span className="text-green-400">Copied!</span>
+                    ) : (
+                      <span>{connectedAccount.slice(0, 6)}...</span>
+                    )}
+                  </button>
                 </div>
                 <button
                   onClick={handleDisconnectWallet}
@@ -1306,6 +1333,34 @@ function App() {
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Network Environment Warning */}
+        <div className={`mb-6 ${isTestNet() ? 'bg-yellow-900/30 border-yellow-600/50' : 'bg-blue-900/30 border border-blue-600/50'} rounded-xl p-4 flex items-start space-x-3`}>
+          <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-300' : 'text-blue-300'} flex-shrink-0 mt-0.5`} />
+          <div>
+            <h3 className={`${isTestNet() ? 'text-yellow-200' : 'text-blue-200'} font-medium`}>
+              {getNetworkConfig().name} Environment
+            </h3>
+            <p className={`${isTestNet() ? 'text-yellow-100' : 'text-blue-100'} text-sm mt-1`}>
+              {isTestNet() ? (
+                <>
+                  This app is running on Algorand TestNet. Use TestNet Algos for testing. 
+                  Get free TestNet Algos from the{' '}
+                  <a 
+                    href={getNetworkConfig().dispenserUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="underline hover:no-underline"
+                  >
+                    Algorand TestNet Dispenser
+                  </a>.
+                </>
+              ) : (
+                'This app is running on Algorand MainNet. Real ALGO will be used for all transactions. Please be careful and double-check all details before sending.'
+              )}
+            </p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
           {/* Main Form Area - Left Side */}
           <div className="lg:col-span-4">
@@ -1329,19 +1384,6 @@ function App() {
           </div>
         )}
 
-        {/* MainNet Warning */}
-        {isMainNet() && (
-          <div className="mb-6 bg-orange-900/30 border border-orange-600/50 rounded-xl p-4 flex items-start space-x-3">
-            <AlertTriangle className="w-5 h-5 text-orange-300 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-orange-200 font-medium">MainNet Warning</h3>
-              <p className="text-orange-100 text-sm mt-1">
-                You are using the live Algorand MainNet. Real ALGO will be used for transactions. 
-                Maximum amount is limited to 10 ALGO for safety.
-              </p>
-            </div>
-          </div>
-        )}
 
 
         {/* Send Money Tab */}
@@ -1600,7 +1642,6 @@ function App() {
                         className="w-full px-4 py-3 text-lg bg-purple-800/30 backdrop-blur-sm border border-purple-600/50 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-all disabled:bg-purple-900/20 disabled:cursor-not-allowed text-white placeholder-purple-300"
                         step="0.001"
                         min="0.1"
-                        max={isMainNet() ? "10" : undefined}
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-300 font-medium">
                         ALGO
@@ -1614,11 +1655,6 @@ function App() {
                         </span>
                       </div>
                     </div>
-                    {isMainNet() && (
-                      <p className="text-xs text-purple-200 mt-1">
-                        Maximum: 10 ALGO for safety on MainNet
-                      </p>
-                    )}
                   </div>
 
                   {/* Recipient Input */}
@@ -2514,33 +2550,6 @@ function App() {
           </>
         )}
 
-        {/* Network Notice */}
-        <div className={`mt-6 ${isTestNet() ? 'bg-yellow-900/30 border-yellow-600/50' : 'bg-orange-900/30 border-orange-600/50'} border rounded-xl p-4 flex items-start space-x-3`}>
-          <Info className={`w-5 h-5 ${isTestNet() ? 'text-yellow-300' : 'text-orange-300'} flex-shrink-0 mt-0.5`} />
-          <div>
-            <h3 className={`${isTestNet() ? 'text-yellow-200' : 'text-orange-200'} font-medium`}>
-              {getNetworkConfig().name} Environment
-            </h3>
-            <p className={`${isTestNet() ? 'text-yellow-100' : 'text-orange-100'} text-sm mt-1`}>
-              {isTestNet() ? (
-                <>
-                  This app is running on Algorand TestNet. Use TestNet Algos for testing. 
-                  Get free TestNet Algos from the{' '}
-                  <a 
-                    href={getNetworkConfig().dispenserUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="underline hover:no-underline"
-                  >
-                    Algorand TestNet Dispenser
-                  </a>.
-                </>
-              ) : (
-                'This app is running on Algorand MainNet. Real ALGO will be used for all transactions. Please be careful and double-check all details before sending.'
-              )}
-            </p>
-          </div>
-        </div>
           </div>
           
           {/* How it Works Sidebar - Right Side */}

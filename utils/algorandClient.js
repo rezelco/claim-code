@@ -17,7 +17,7 @@ export const NETWORK_CONFIGS = {
 };
 
 // Create Algorand client for specific network
-export function createAlgodClient(network = 'testnet') {
+export function createAlgodClient(network = 'mainnet') {
   const config = NETWORK_CONFIGS[network];
   if (!config) {
     throw new Error(`Unsupported network: ${network}`);
