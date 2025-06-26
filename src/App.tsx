@@ -1253,10 +1253,10 @@ function App() {
             <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">
               <Send className="w-6 h-6 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">RandCash</h1>
+            <a href="/" className="hover:opacity-80 transition-opacity">
+              <h1 className="text-xl font-bold text-white">RandCash.app</h1>
               <p className="text-sm text-purple-100 hidden sm:block">Send crypto with claim codes</p>
-            </div>
+            </a>
           </div>
           
           <div className="flex items-center space-x-2 sm:space-x-4">
