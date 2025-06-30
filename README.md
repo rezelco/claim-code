@@ -1,122 +1,196 @@
-# RandCash
+# RandCash - Send Algorand to Anyone via Email
 
-A decentralized application for sending cryptocurrency via claim codes on the Algorand blockchain.
+<div align="center">
+  <img src="public/randcash.svg" alt="RandCash Logo" width="120" />
+  
+  [![Built on Algorand](https://img.shields.io/badge/Built%20on-Algorand-00D4AA?style=flat-square&logo=algorand)](https://algorand.com)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+  [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+</div>
 
-## Features
+## 🚀 Overview
 
-- Send ALGO to anyone via email using claim codes
-- Smart contract-based claiming system with automatic refunds
-- Support for Algorand TestNet and MainNet
-- Email notifications via Pica/Resend integration
+RandCash revolutionizes cryptocurrency transfers by allowing anyone to send ALGO (Algorand's native cryptocurrency) using just an email address. Recipients don't need a crypto wallet beforehand - they can claim their funds whenever they're ready.
 
-## Technology Stack
+### 🎯 Key Features
+
+- **📧 Email-based Transfers** - Send ALGO to any email address
+- **🔐 Secure Claim Codes** - Cryptographically secure one-time codes
+- **📜 Smart Contract Security** - Funds held safely on-chain until claimed
+- **↩️ Automatic Refunds** - Unclaimed funds can be refunded after 5 minutes
+- **🌐 Network Support** - Works on both TestNet and MainNet
+- **📱 Mobile Friendly** - Responsive design works on all devices
+- **🔍 Transaction Tracking** - Monitor all your sent transactions
+
+## 🛠️ Tech Stack
 
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
-- **Backend**: Netlify Functions (serverless)
-- **Blockchain**: Algorand (using AlgoSDK)
-- **Email**: Pica/Resend API
-- **Deployment**: Netlify
+- **Backend**: Netlify Functions (Serverless)
+- **Blockchain**: Algorand + AlgoSDK
+- **Smart Contracts**: TEAL v6
+- **Wallet**: Pera Wallet Connect
+- **Email Service**: Resend API
 
-## Development Setup
+## 📋 Prerequisites
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd randcash
-   ```
+- Node.js 18+ and npm
+- [Pera Wallet](https://perawallet.app/) (for sending/receiving)
+- [Netlify CLI](https://docs.netlify.com/cli/get-started/) (for local development)
+- Algorand account with ALGO (get free TestNet ALGO from [faucet](https://bank.testnet.algorand.network/))
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## 🚀 Quick Start
 
-3. **Environment Configuration**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and configure:
-   - `PICA_SECRET_KEY`: Your Pica API secret key
-   - `PICA_RESEND_CONNECTION_KEY`: Your Pica Resend connection key
-   - `PICA_FROM_EMAIL`: Email address for sending notifications
-
-4. **Development with Netlify Functions**
-   ```bash
-   npm run netlify:dev
-   ```
-   
-   This starts:
-   - Vite dev server on port 5173
-   - Netlify dev server on port 3000
-   - All serverless functions available at `/api/*`
-
-5. **Alternative Development (Legacy)**
-   ```bash
-   npm run dev:full
-   ```
-   
-   This starts the old Express server and Vite concurrently.
-
-## Deployment
-
-### Netlify Deployment
-
-1. **Build the application**
-   ```bash
-   npm run build
-   ```
-
-2. **Deploy to Netlify**
-   ```bash
-   npm run netlify:deploy
-   ```
-
-3. **Environment Variables**
-   Configure the following in your Netlify dashboard:
-   - `PICA_SECRET_KEY`
-   - `PICA_RESEND_CONNECTION_KEY`
-   - `PICA_FROM_EMAIL`
-   - `NODE_VERSION=18`
-
-### Manual Netlify Setup
-
-1. Connect your repository to Netlify
-2. Set build command: `npm run build`
-3. Set publish directory: `dist`
-4. Configure environment variables
-5. Deploy
-
-## API Endpoints
-
-All endpoints are available as Netlify Functions under `/api/`:
-
-- `POST /api/create-claim` - Create a new claim
-- `POST /api/submit-transaction` - Submit signed transaction
-- `POST /api/claim-with-code` - Create claim transaction
-- `POST /api/submit-claim` - Submit signed claim transaction
-- `POST /api/refund-funds` - Create refund transaction
-- `POST /api/fund-contract` - Create funding transaction
-- `GET /api/health` - Health check
-
-## Project Structure
-
-```
-├── netlify/functions/          # Serverless functions
-├── utils/                      # Shared utilities
-├── src/                        # React frontend
-├── server/                     # Legacy Express server
-├── netlify.toml               # Netlify configuration
-└── vite.config.ts             # Vite configuration
+### 1. Clone the repository
+```bash
+git clone https://github.com/yourusername/randcash.app.git
+cd randcash.app
 ```
 
-## Scripts
+### 2. Install dependencies
+```bash
+npm install
+```
 
-- `npm run dev` - Start Vite dev server
-- `npm run build` - Build for production
-- `npm run netlify:dev` - Start Netlify dev environment
-- `npm run netlify:deploy` - Deploy to Netlify
-- `npm run dev:full` - Start legacy Express + Vite setup
+### 3. Set up environment variables
+Create a `.env` file in the root directory:
+```env
+# Algorand Configuration
+SEED_MNEMONIC="your 25-word mnemonic phrase here"
 
-## License
+# Resend Email Service
+RESEND_API_KEY="re_xxxxxxxx"
+RESEND_FROM_EMAIL="noreply@yourdomain.com"
 
-MIT License
+# Network Configuration (optional)
+ALGORAND_NETWORK="testnet" # or "mainnet"
+```
+
+### 4. Run the development server
+```bash
+npm run dev
+```
+
+The app will be available at `http://localhost:8888`
+
+## 🏗️ Project Structure
+
+```
+randcash.app/
+├── src/                    # React frontend source
+│   ├── components/         # React components
+│   ├── utils/             # Utility functions
+│   └── App.tsx            # Main application component
+├── netlify/               # Netlify Functions (serverless backend)
+│   └── functions/         
+│       └── create-claim.js # Smart contract deployment
+├── server/                # Local development server
+│   ├── index.js           # Express server
+│   └── services/          # Backend services
+├── public/                # Static assets
+└── CLAUDE.md             # Development instructions
+```
+
+## 💻 Development
+
+### Available Scripts
+
+```bash
+# Start development server with Netlify Dev
+npm run dev
+
+# Build for production
+npm run build
+
+# Run linting
+npm run lint
+
+# Deploy to Netlify
+npm run netlify:deploy
+```
+
+### Smart Contract Development
+
+The TEAL smart contract code is located in:
+- `/server/index.js` - For local development
+- `/netlify/functions/create-claim.js` - For production
+
+⚠️ **Important**: Keep both files synchronized when making contract changes.
+
+## 🔐 How It Works
+
+### For Senders
+1. Connect your Pera wallet
+2. Enter recipient's email and amount
+3. Sign the transaction
+4. Claim code is generated and emailed automatically
+
+### For Recipients
+1. Receive email with claim code
+2. Visit RandCash and go to "Claim" tab
+3. Connect or create a Pera wallet
+4. Enter claim code and receive funds
+
+### Security Features
+- Claim codes are SHA-256 hashed on-chain
+- One-time use only
+- Funds locked in smart contracts
+- Automatic refund protection
+- All transactions verifiable on-chain
+
+## 🌐 Deployment
+
+### Deploy to Netlify
+
+1. Fork this repository
+2. Connect to Netlify via GitHub
+3. Set environment variables in Netlify dashboard
+4. Deploy!
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/yourusername/randcash.app)
+
+## 🧪 Testing
+
+### TestNet Testing
+1. Get free TestNet ALGO from the [dispenser](https://bank.testnet.algorand.network/)
+2. Use TestNet in the app settings
+3. Test sending and claiming without real funds
+
+### Smart Contract Testing
+The smart contracts support three operations:
+- `claim` - Verify and transfer funds
+- `refund` - Return unclaimed funds after timeout
+- `delete` - Clean up empty contracts
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built on [Algorand](https://algorand.com/) blockchain
+- Uses [Pera Wallet](https://perawallet.app/) for wallet connectivity
+- Email service powered by [Resend](https://resend.com/)
+- Hosted on [Netlify](https://netlify.com/)
+
+## 📧 Contact
+
+Questions? Issues? Feel free to:
+- Open an [issue](https://github.com/yourusername/randcash.app/issues)
+- Start a [discussion](https://github.com/yourusername/randcash.app/discussions)
+
+---
+
+<div align="center">
+  Made with ❤️ on Algorand
+</div>
