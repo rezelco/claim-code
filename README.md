@@ -1,7 +1,6 @@
 # RandCash - Send Algorand to Anyone via Email
 
 <div align="center">
-  <img src="public/randcash.svg" alt="RandCash Logo" width="120" />
   
   [![Built on Algorand](https://img.shields.io/badge/Built%20on-Algorand-00D4AA?style=flat-square&logo=algorand)](https://algorand.com)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
